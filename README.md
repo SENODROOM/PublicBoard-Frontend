@@ -1,377 +1,316 @@
-# PublicBoard Frontend 🎨
+# PublicBoard — Frontend
 
-The modern, responsive web interface for PublicBoard - A community issue reporting platform. Built with React 18, Vite, and Tailwind CSS.
-
-## 📋 Overview
-
-This frontend application provides an intuitive and accessible interface for community members to report, track, and manage public issues. It features a clean design, real-time updates, and a seamless user experience across all devices.
-
-## 🛠️ Tech Stack
-
-- **React 18** - Modern React with hooks and concurrent features
-- **Vite** - Lightning-fast build tool and development server
-- **React Router DOM** - Client-side routing with navigation
-- **Axios** - Promise-based HTTP client for API calls
-- **Tailwind CSS** - Utility-first CSS framework for styling
-- **ESLint** - Code quality and consistency tooling
-
-## ✨ Features
-
-### User Features
-- **🏠 Dashboard** - View and browse all community issues
-- **📝 Issue Reporting** - Easy-to-use form for reporting new issues
-- **🔍 Issue Details** - Comprehensive view of individual issues
-- **📊 Statistics** - Visual analytics and insights
-- **🌙 Dark Mode** - Toggle between light and dark themes
-- **📱 Responsive Design** - Optimized for mobile, tablet, and desktop
-
-### Admin Features
-- **🔐 Admin Authentication** - Secure login for administrators
-- **⚙️ Admin Dashboard** - Manage and resolve issues
-- **📈 Issue Management** - Update status, priority, and details
-- **👥 User Management** - Overview of community activity
-
-## 📦 Installation & Setup
-
-### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
-- Backend API server running (see [backend README](../backend/README.md))
-
-### Quick Start
-
-1. **Navigate to the frontend directory**
-   ```bash
-   cd frontend
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**
-   
-   Create a `.env` file in the root of the frontend directory:
-   ```env
-   VITE_API_URL=http://localhost:5000
-   ```
-
-4. **Start the development server**
-   ```bash
-   npm run dev
-   ```
-
-   The application will be available at `http://localhost:5173`
-
-## 🗂️ Project Structure
-
-```
-frontend/
-├── public/
-│   ├── favicon.ico        # Site favicon
-│   └── other assets       # Static assets
-├── src/
-│   ├── components/        # Reusable React components
-│   │   ├── Layout.jsx     # Main layout wrapper
-│   │   ├── ProtectedRoute.jsx  # Route protection
-│   │   ├── Toast.jsx      # Notification component
-│   │   └── ...            # Other UI components
-│   ├── context/           # React context providers
-│   │   ├── AdminContext.jsx    # Admin authentication state
-│   │   └── ThemeContext.jsx     # Theme management
-│   ├── pages/             # Page-level components
-│   │   ├── Dashboard.jsx       # Main dashboard
-│   │   ├── ReportIssue.jsx     # Issue reporting form
-│   │   ├── IssueDetail.jsx     # Issue details view
-│   │   ├── Statistics.jsx      # Analytics page
-│   │   ├── AdminLogin.jsx      # Admin login
-│   │   └── AdminDashboard.jsx  # Admin interface
-│   ├── utils/             # Utility functions
-│   │   └── api.js         # API helper functions
-│   ├── App.jsx            # Main App component
-│   ├── main.jsx           # Application entry point
-│   └── index.css          # Global styles
-├── .env                   # Environment variables (create this)
-├── .eslintrc.cjs          # ESLint configuration
-├── .gitignore             # Git ignore file
-├── index.html             # HTML template
-├── package.json           # Dependencies and scripts
-├── vite.config.js         # Vite configuration
-└── README.md              # This file
-```
-
-## 🎨 Components Overview
-
-### Core Components
-
-- **Layout**: Main application layout with navigation and footer
-- **ProtectedRoute**: Route protection for admin-only pages
-- **Toast**: Global notification system for user feedback
-
-### Context Providers
-
-- **AdminContext**: Manages admin authentication state
-- **ThemeContext**: Handles light/dark theme switching
-- **ToastContext**: Global toast notification management
-
-### Page Components
-
-- **Dashboard**: Browse and filter community issues
-- **ReportIssue**: Form for submitting new issues
-- **IssueDetail**: Detailed view of individual issues
-- **Statistics**: Charts and analytics dashboard
-- **AdminLogin**: Authentication for administrators
-- **AdminDashboard**: Administrative interface
-
-## 🎯 Available Scripts
-
-```bash
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Run ESLint
-npm run lint
-```
-
-## 🌐 Application Routes
-
-### Public Routes
-- `/` - Main dashboard (home page)
-- `/report` - Report a new issue
-- `/issues/:id` - View specific issue details
-- `/statistics` - Community statistics and analytics
-
-### Admin Routes
-- `/admin/login` - Administrator login page
-- `/admin/dashboard` - Admin dashboard (protected)
-
-## 🎨 Theming System
-
-The application supports both light and dark themes:
-
-### Theme Toggle
-- Switch between themes using the theme toggle button
-- Theme preference is persisted in localStorage
-- Smooth transitions between theme changes
-
-### CSS Variables
-Themes are managed through CSS custom properties for easy customization:
-
-```css
-:root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f3f4f6;
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-}
-
-[data-theme="dark"] {
-  --bg-primary: #111827;
-  --bg-secondary: #1f2937;
-  --text-primary: #f9fafb;
-  --text-secondary: #9ca3af;
-}
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_URL` | Backend API base URL | http://localhost:5000 |
-
-### Vite Configuration
-
-The `vite.config.js` includes:
-- React plugin for fast refresh
-- Development server configuration
-- Build optimization settings
-
-## 📱 Responsive Design
-
-The application is fully responsive with breakpoints for:
-- **Mobile**: < 640px
-- **Tablet**: 640px - 1024px
-- **Desktop**: > 1024px
-
-### Mobile Features
-- Touch-friendly interface
-- Optimized navigation
-- Swipe gestures (where applicable)
-- Adaptive layouts
-
-## 🚀 Deployment
-
-### Build for Production
-
-1. **Create production build**
-   ```bash
-   npm run build
-   ```
-
-2. **Preview the build**
-   ```bash
-   npm run preview
-   ```
-
-3. **Deploy to hosting service**
-   
-   The build output in `dist/` can be deployed to:
-   - Netlify
-   - Vercel
-   - GitHub Pages
-   - Any static hosting service
-
-### Environment-Specific Builds
-
-Set the API URL for different environments:
-
-```bash
-# Development
-VITE_API_URL=http://localhost:5000
-
-# Staging
-VITE_API_URL=https://staging-api.publicboard.com
-
-# Production
-VITE_API_URL=https://api.publicboard.com
-```
-
-## 🧪 Development
-
-### Code Quality
-
-The project uses ESLint for code quality:
-```bash
-npm run lint
-```
-
-### Hot Module Replacement
-
-Vite provides fast HMR for:
-- Component changes
-- Style updates
-- Configuration modifications
-
-### Development Tips
-
-1. **Component Development**: Use React DevTools for debugging
-2. **Network Debugging**: Use browser DevTools Network tab
-3. **State Management**: Leverage React DevTools Profiler
-4. **Styling**: Use Tailwind IntelliSense in your IDE
-
-## 🎨 UI/UX Guidelines
-
-### Design Principles
-- **Consistency**: Uniform design language throughout
-- **Accessibility**: WCAG 2.1 AA compliance
-- **Performance**: Optimized for fast loading
-- **User Experience**: Intuitive and predictable interactions
-
-### Color Scheme
-- **Primary**: Blue tones for primary actions
-- **Success**: Green for positive feedback
-- **Warning**: Yellow/Orange for cautions
-- **Error**: Red for errors and warnings
-- **Neutral**: Gray scales for text and backgrounds
-
-## 🔒 Security Features
-
-- **Input Validation**: Client-side validation for all forms
-- **XSS Prevention**: Proper data sanitization
-- **Secure Routing**: Protected admin routes
-- **API Security**: Proper error handling without information leakage
-
-## 🤝 Contributing to Frontend
-
-We welcome frontend contributions! Here's how to get started:
-
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/your-feature
-   ```
-3. **Make your changes**
-4. **Test thoroughly**
-   ```bash
-   npm run dev
-   ```
-5. **Run linting**
-   ```bash
-   npm run lint
-   ```
-6. **Submit a pull request**
-
-### Frontend Development Guidelines
-
-- Follow React best practices and hooks patterns
-- Use Tailwind CSS classes for styling
-- Ensure responsive design for all components
-- Write accessible HTML semantics
-- Test on multiple screen sizes
-- Follow existing component patterns
-- Add comments for complex logic
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Development Server Not Starting:**
-```bash
-# Clear Vite cache
-npm run dev -- --force
-
-# Reinstall dependencies
-rm -rf node_modules package-lock.json
-npm install
-```
-
-**API Connection Issues:**
-- Verify backend server is running
-- Check `VITE_API_URL` in `.env` file
-- Ensure CORS is configured on backend
-
-**Build Errors:**
-```bash
-# Clear build cache
-rm -rf dist
-npm run build
-```
-
-**Styling Issues:**
-- Verify Tailwind CSS is properly imported
-- Check for conflicting CSS classes
-- Ensure responsive prefixes are correct
-
-## 📚 Learning Resources
-
-For developers new to the tech stack:
-
-- [React Documentation](https://react.dev/)
-- [Vite Guide](https://vitejs.dev/guide/)
-- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
-- [React Router Documentation](https://reactrouter.com/)
-
-## 📞 Support
-
-For frontend-specific issues:
-
-1. Check the [troubleshooting section](#-troubleshooting)
-2. Search existing [GitHub issues](https://github.com/yourusername/PublicBoard/issues)
-3. Create a new issue with:
-   - Detailed description of the issue
-   - Steps to reproduce
-   - Browser and device information
-   - Screenshots if applicable
+> React 18 SPA for the PublicBoard community issue tracking platform.
 
 ---
 
-**Built with ❤️ and modern web technologies for the PublicBoard community**
+## 🚀 Quick Start
+
+```bash
+cd client
+npm install
+npm start
+# App runs on http://localhost:3000
+# Proxies API calls to http://localhost:5000
+```
+
+---
+
+## 📁 Project Structure
+
+```
+client/
+├── package.json
+├── public/
+│   └── index.html
+└── src/
+    ├── App.js                        # Router + Toaster + route guards
+    ├── index.js                      # React DOM entry
+    ├── index.css                     # Global design system + responsive
+    ├── api.js                        # Axios instance + all API methods
+    ├── context/
+    │   └── AuthContext.js            # Auth state, login/register/logout
+    ├── components/
+    │   ├── Navbar.js                 # Responsive sticky nav + mobile menu
+    │   └── IssueCard.js             # Reusable issue card component
+    └── pages/
+        ├── Home.js                   # Landing page
+        ├── Dashboard.js              # Issue list with filters
+        ├── ReportIssue.js           # Issue submission form
+        ├── IssueDetail.js           # Single issue + update timeline
+        ├── Donate.js                # Donation platform
+        ├── Login.js                 # Login form
+        ├── Register.js              # Registration form
+        └── admin/
+            ├── AdminLayout.js        # Sidebar layout + mobile nav
+            ├── AdminOverview.js      # Dashboard stats + charts
+            ├── AdminIssues.js        # Issue CRUD + bulk actions
+            ├── AdminUsers.js         # User management + role control
+            └── AdminDonations.js     # Donation records
+```
+
+---
+
+## 🎨 Design System
+
+PublicBoard uses a custom **brutalist/editorial** design aesthetic:
+
+### Fonts
+- **Display:** `Syne` (800 weight) — headings, numbers, labels
+- **Body/Code:** `Space Mono` — navigation, tags, forms, metadata
+
+### Color Palette
+```css
+--ink:    #0a0a0f   /* Near-black — primary text, borders, buttons */
+--paper:  #f5f0e8   /* Warm off-white — page background */
+--cement: #c8c2b4   /* Muted beige — secondary text */
+--amber:  #e8a020   /* Gold — accents, CTA, highlights */
+--green:  #2a7a4a   /* Forest green — resolved, donations, success */
+--red:    #c83232   /* Brick red — open issues, errors, alerts */
+--blue:   #1a4a8a   /* Navy — in-progress issues */
+--purple: #6a3a9a   /* Plum — pending review, transportation */
+```
+
+### Key CSS Variables
+```css
+--shadow:    4px 4px 0px #0a0a0f   /* Hard offset shadow (brutalist) */
+--shadow-lg: 6px 6px 0px #0a0a0f  /* Larger variant */
+--radius:    0px                    /* No border radius — intentional */
+```
+
+### Components
+
+**Buttons:**
+```jsx
+<button className="btn">Default</button>
+<button className="btn btn-primary">Dark filled</button>
+<button className="btn btn-amber">Amber accent</button>
+<button className="btn btn-green">Green / success</button>
+<button className="btn btn-red">Red / danger</button>
+<button className="btn btn-sm">Small</button>
+<button className="btn btn-lg">Large</button>
+```
+
+**Status Badges:**
+```jsx
+<span className="badge badge-open">Open</span>
+<span className="badge badge-progress">In Progress</span>
+<span className="badge badge-pending">Pending Review</span>
+<span className="badge badge-resolved">Resolved</span>
+```
+
+**Grid Layouts:**
+```jsx
+<div className="grid-2">...</div>  /* 2 columns */
+<div className="grid-3">...</div>  /* 3 columns */
+<div className="grid-4">...</div>  /* 4 columns */
+/* All collapse to 1 column on mobile */
+```
+
+---
+
+## 📡 API Layer (`src/api.js`)
+
+All API calls are organized in named exports:
+
+```javascript
+import { issuesAPI, authAPI, donationsAPI, adminAPI } from './api';
+
+// Issues
+issuesAPI.getAll({ status: 'Open', category: 'Infrastructure', search: 'road', sort: '-createdAt' })
+issuesAPI.getOne(id)
+issuesAPI.getStats()
+issuesAPI.create({ title, description, category, location, reporter })
+issuesAPI.support(id)                            // toggle support (JWT)
+issuesAPI.updateStatus(id, { status, message }) // JWT required
+
+// Auth
+authAPI.register({ name, email, password })
+authAPI.login({ email, password })
+authAPI.me()                                    // JWT required
+
+// Donations
+donationsAPI.getAll()
+donationsAPI.getStats()
+donationsAPI.create({ name, email, amount, message, isAnonymous })
+
+// Admin (JWT + admin role required)
+adminAPI.getOverview()
+adminAPI.getUsers({ search, role, page, limit })
+adminAPI.getUser(id)
+adminAPI.updateUserRole(id, role)
+adminAPI.deleteUser(id)
+adminAPI.getIssues({ status, category, search, sort, page, limit })
+adminAPI.updateIssue(id, { status, message })
+adminAPI.deleteIssue(id)
+adminAPI.bulkStatusUpdate(ids, status)
+adminAPI.bulkDelete(ids)
+adminAPI.getDonations({ status, page, limit })
+```
+
+The Axios instance automatically:
+1. Sets `baseURL` from `REACT_APP_API_URL` env var (fallback: `http://localhost:5000/api`)
+2. Injects `Authorization: Bearer <token>` from `localStorage` on every request
+
+---
+
+## 🔐 Auth Context (`src/context/AuthContext.js`)
+
+```jsx
+import { useAuth } from './context/AuthContext';
+
+const { user, loading, login, register, logout } = useAuth();
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `user` | Object\|null | Current user `{ id, name, email, role }` |
+| `loading` | Boolean | True while verifying token on mount |
+| `login(email, pass)` | Function | Logs in and stores token |
+| `register(name, email, pass)` | Function | Registers and stores token |
+| `logout()` | Function | Clears token and resets user |
+
+---
+
+## 📱 Responsive Design
+
+The app is fully responsive with breakpoints:
+
+| Breakpoint | Behavior |
+|-----------|----------|
+| `> 1024px` | Full layout — 3–4 column grids |
+| `769px–1024px` | 2-column grids |
+| `< 768px` | Mobile — hamburger nav, single column, stacked forms |
+| `< 480px` | Compact — reduced font sizes, minimal padding |
+
+**Mobile Navbar:**
+- Desktop: horizontal link bar
+- Mobile: hamburger button (☰) reveals a full-width dropdown menu
+- Admin panel: separate fixed top bar + collapsible sidebar menu
+
+---
+
+## 🛡️ Route Guards
+
+**Admin routes** (`/admin/*`) are protected by `AdminRoute`:
+```jsx
+const AdminRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingSpinner />;
+  if (!user) return <Navigate to="/login" />;
+  if (user.role !== 'admin') return <Navigate to="/" />;
+  return children;
+};
+```
+
+Non-admin users who try to access `/admin/*` are redirected to home.
+
+---
+
+## 🏛️ Admin Panel Pages
+
+### Overview (`/admin`)
+- Live statistics cards: total issues, open/in-progress/resolved counts, users, total raised
+- Category breakdown bar chart
+- Status distribution with progress bars
+- Recent issues, users, and donations feed
+
+### Issue Management (`/admin/issues`)
+- Full paginated table with status color coding
+- Filters: search text, category, status, sort
+- Inline "Edit" modal: change status + add admin note
+- Bulk actions: select multiple → change status or delete all
+- Delete individual issues
+
+### User Management (`/admin/users`)
+- Paginated user table with role badges
+- Search by name or email, filter by role
+- Promote/demote users between `user` and `admin`
+- View user profile modal with their reported issues
+- Delete user accounts
+
+### Donation Management (`/admin/donations`)
+- Full donation history table
+- Real donor info (respects anonymous flag in public API, reveals it in admin)
+- Filter by payment status
+- Stats: page total, record count, average donation
+
+---
+
+## 📦 Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `react` | ^18.2 | UI framework |
+| `react-dom` | ^18.2 | DOM rendering |
+| `react-router-dom` | ^6.14 | Client-side routing |
+| `axios` | ^1.4 | HTTP client |
+| `react-hot-toast` | ^2.4 | Toast notifications |
+| `react-scripts` | 5.0.1 | CRA build toolchain |
+
+---
+
+## 🌐 Environment Variables
+
+Create a `.env` file in the `client/` directory:
+
+```env
+REACT_APP_API_URL=http://localhost:5000/api
+```
+
+For production:
+```env
+REACT_APP_API_URL=https://your-api-domain.com/api
+```
+
+> All React env vars **must** start with `REACT_APP_` to be accessible in the browser.
+
+---
+
+## 🏗️ Build for Production
+
+```bash
+npm run build
+```
+
+Outputs to `client/build/`. Deploy this folder to:
+- **Vercel** — connect the repo, set root to `client/`, auto-deploy
+- **Netlify** — drag-drop the `build/` folder or connect GitHub
+- **Nginx** — serve `build/` with `try_files $uri /index.html`
+
+---
+
+## 🧩 Adding New Pages
+
+1. Create `src/pages/MyPage.js`
+2. Add route in `src/App.js`:
+   ```jsx
+   <Route path="/my-page" element={<PublicLayout><MyPage /></PublicLayout>} />
+   ```
+3. Add link to `Navbar.js` `navLinks` array if needed
+
+---
+
+## 🎯 Key Patterns
+
+**Data fetching with loading state:**
+```jsx
+const [data, setData] = useState(null);
+const [loading, setLoading] = useState(true);
+
+useEffect(() => {
+  someAPI.getData()
+    .then(r => setData(r.data))
+    .catch(() => toast.error('Failed'))
+    .finally(() => setLoading(false));
+}, []);
+```
+
+**Conditional auth checks:**
+```jsx
+const { user } = useAuth();
+const handleProtected = () => {
+  if (!user) return toast.error('Please login first');
+  // proceed...
+};
+```
