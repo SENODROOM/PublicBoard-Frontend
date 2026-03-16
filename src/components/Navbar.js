@@ -1,159 +1,172 @@
-import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { issuesAPI } from '../api';
 
 export default function Navbar() {
-  const { user, logout, isAdmin } = useAuth();
-  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [openCount, setOpenCount] = useState(null);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('pb_dark') === '1');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-    setMenuOpen(false);
+  useEffect(() => {
+    issuesAPI.getStats()
+      .then(d => setOpenCount(d.open || 0))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle('dark-mode', darkMode);
+    localStorage.setItem('pb_dark', darkMode ? '1' : '0');
+  }, [darkMode]);
+
+  // Keyboard shortcut: "/" focuses search
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        document.getElementById('navbar-search')?.focus();
+      }
+      if (e.key === 'Escape') {
+        document.getElementById('navbar-search')?.blur();
+        setSearchQuery('');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery('');
+    }
   };
 
-  const baseLinks = [
-    { to: '/',          label: 'Home' },
-    { to: '/dashboard', label: 'Dashboard' },
-    { to: '/report',    label: 'Report' },
-    { to: '/donate',    label: 'Donate' },
-  ];
-
-  const isActive = (to) =>
-    to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
+  const navLink = (to, label, extra) => {
+    const active = location.pathname === to || location.pathname.startsWith(to + '/');
+    return (
+      <Link to={to} style={{
+        textDecoration: 'none', fontSize: 14, fontWeight: 500,
+        color: active ? '#4f46e5' : '#374151',
+        borderBottom: active ? '2px solid #4f46e5' : '2px solid transparent',
+        paddingBottom: 2, transition: 'color 0.15s',
+        display: 'flex', alignItems: 'center', gap: 4
+      }}>
+        {label}
+        {extra}
+      </Link>
+    );
+  };
 
   return (
-    <nav style={{ background: 'var(--ink)', borderBottom: '3px solid var(--amber)', position: 'sticky', top: 0, zIndex: 100 }}>
-      <div className="container">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
+    <nav style={{
+      background: '#fff', borderBottom: '1px solid #e5e7eb',
+      padding: '0 24px', height: 58,
+      display: 'flex', alignItems: 'center', gap: 20,
+      position: 'sticky', top: 0, zIndex: 100,
+    }}>
+      {/* Logo */}
+      <Link to="/" style={{ textDecoration: 'none', fontWeight: 800, fontSize: 17, color: '#111827', letterSpacing: '-0.02em', marginRight: 8 }}>
+        Public<span style={{ color: '#4f46e5' }}>Board</span>
+      </Link>
 
-          {/* Logo */}
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-            <div style={{ width: 34, height: 34, background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--ink)', border: '2px solid rgba(255,255,255,0.15)' }}>PB</div>
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 17, color: 'var(--paper)', letterSpacing: '-0.02em' }}>PublicBoard</span>
-          </Link>
-
-          {/* Desktop links */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, justifyContent: 'center' }} className="nav-desktop">
-            {baseLinks.map(link => (
-              <Link key={link.to} to={link.to} style={{
-                color: isActive(link.to) ? 'var(--amber)' : 'var(--cement)',
-                fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
-                textTransform: 'uppercase', letterSpacing: '0.08em',
-                padding: '8px 12px',
-                borderBottom: isActive(link.to) ? '2px solid var(--amber)' : '2px solid transparent',
-                transition: 'all 0.15s', whiteSpace: 'nowrap'
-              }}>{link.label}</Link>
-            ))}
-
-            {/* Admin panel link — only for admins */}
-            {isAdmin && (
-              <Link to="/admin" style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                marginLeft: 8,
-                padding: '6px 14px',
-                background: location.pathname.startsWith('/admin') ? 'var(--amber)' : 'rgba(232,160,32,0.15)',
-                color: 'var(--amber)',
-                fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
-                textTransform: 'uppercase', letterSpacing: '0.1em',
-                border: '1px solid var(--amber)',
-                whiteSpace: 'nowrap', transition: 'all 0.15s'
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--amber)'}
-              onMouseLeave={e => e.currentTarget.style.background = location.pathname.startsWith('/admin') ? 'var(--amber)' : 'rgba(232,160,32,0.15)'}
-              >
-                ⬛ Admin Panel
-              </Link>
-            )}
-          </div>
-
-          {/* Desktop auth */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }} className="nav-desktop">
-            {user ? (
-              <>
-                <span style={{ color: 'var(--cement)', fontSize: 11, fontFamily: 'var(--font-mono)', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {isAdmin && <span style={{ color: 'var(--amber)', marginRight: 4 }}>[ADMIN]</span>}
-                  {user.name}
-                </span>
-                <button onClick={handleLogout} className="btn btn-sm" style={{ background: 'transparent', color: '#c83232', borderColor: '#c83232', fontSize: 11 }}>
-                  Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <Link to="/login"    className="btn btn-sm" style={{ background: 'transparent', color: 'var(--paper)', borderColor: '#555', fontSize: 11 }}>Login</Link>
-                <Link to="/register" className="btn btn-sm btn-amber" style={{ fontSize: 11 }}>Register</Link>
-              </>
-            )}
-          </div>
-
-          {/* Hamburger — mobile only */}
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="nav-hamburger"
-            style={{ background: 'none', border: '1px solid #444', color: 'var(--paper)', padding: '6px 14px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 14, display: 'none' }}
-            aria-label="Toggle menu"
-          >
-            {menuOpen ? '✕' : '☰'}
-          </button>
-        </div>
+      {/* Nav links */}
+      <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+        {navLink('/dashboard', 'Dashboard',
+          openCount != null && openCount > 0 && (
+            <span style={{ background: '#ef4444', color: '#fff', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '1px 5px', minWidth: 16, textAlign: 'center' }}>
+              {openCount > 99 ? '99+' : openCount}
+            </span>
+          )
+        )}
+        {navLink('/search', 'Search')}
+        {navLink('/report', 'Report Issue')}
+        {user && navLink('/bookmarks', '🔖 Saved')}
+        {user?.role === 'admin' && navLink('/admin', 'Admin')}
       </div>
 
-      {/* Mobile dropdown */}
-      {menuOpen && (
-        <div style={{ background: '#111', borderTop: '1px solid #333' }}>
-          {baseLinks.map(link => (
-            <Link key={link.to} to={link.to} onClick={() => setMenuOpen(false)} style={{
-              display: 'block', padding: '14px 24px',
-              color: isActive(link.to) ? 'var(--amber)' : 'var(--cement)',
-              fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: isActive(link.to) ? 700 : 400,
-              borderBottom: '1px solid #222',
-              borderLeft: isActive(link.to) ? '3px solid var(--amber)' : '3px solid transparent',
-              textDecoration: 'none'
-            }}>{link.label}</Link>
-          ))}
+      {/* Inline search bar */}
+      <form onSubmit={handleSearch} style={{ flex: 1, maxWidth: 280, marginLeft: 'auto' }}>
+        <div style={{ position: 'relative' }}>
+          <input
+            id="navbar-search"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder='Search… ("/" to focus)'
+            style={{
+              width: '100%', padding: '7px 12px 7px 32px', borderRadius: 20,
+              border: '1px solid #e5e7eb', fontSize: 13, outline: 'none',
+              background: '#f9fafb', boxSizing: 'border-box', transition: 'border-color 0.2s, background 0.2s'
+            }}
+            onFocus={e => { e.target.style.background = '#fff'; e.target.style.borderColor = '#4f46e5'; }}
+            onBlur={e => { e.target.style.background = '#f9fafb'; e.target.style.borderColor = '#e5e7eb'; }}
+          />
+          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: 13 }}>🔍</span>
+        </div>
+      </form>
 
-          {/* Admin panel in mobile menu */}
-          {isAdmin && (
-            <Link to="/admin" onClick={() => setMenuOpen(false)} style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '14px 24px',
-              color: 'var(--amber)', background: 'rgba(232,160,32,0.1)',
-              fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
-              borderBottom: '1px solid #333',
-              borderLeft: '3px solid var(--amber)',
-              textDecoration: 'none'
-            }}>⬛ Admin Panel</Link>
-          )}
+      {/* Right side */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Dark mode */}
+        <button onClick={() => setDarkMode(d => !d)}
+          title={darkMode ? 'Light mode' : 'Dark mode'}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: '2px 4px', lineHeight: 1 }}>
+          {darkMode ? '☀️' : '🌙'}
+        </button>
 
-          {/* Mobile auth row */}
-          <div style={{ padding: '14px 24px', borderTop: '1px solid #333', display: 'flex', gap: 10, alignItems: 'center' }}>
-            {user ? (
-              <>
-                <span style={{ color: '#888', fontSize: 12, fontFamily: 'var(--font-mono)', flex: 1 }}>
-                  {isAdmin && <span style={{ color: 'var(--amber)' }}>[ADMIN] </span>}
-                  {user.name}
-                </span>
-                <button onClick={handleLogout} className="btn btn-sm" style={{ background: 'transparent', color: '#c83232', borderColor: '#c83232', fontSize: 11 }}>Logout</button>
-              </>
-            ) : (
-              <>
-                <Link to="/login"    onClick={() => setMenuOpen(false)} className="btn btn-sm" style={{ flex: 1, textAlign: 'center', background: 'transparent', color: 'var(--paper)', borderColor: '#555', fontSize: 12 }}>Login</Link>
-                <Link to="/register" onClick={() => setMenuOpen(false)} className="btn btn-sm btn-amber" style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>Register</Link>
-              </>
+        {user ? (
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setMenuOpen(m => !m)} style={{
+              display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: '1px solid #e5e7eb',
+              padding: '5px 10px', borderRadius: 20, cursor: 'pointer', fontSize: 13
+            }}>
+              <div style={{
+                width: 26, height: 26, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 12, fontWeight: 700
+              }}>{user.name?.[0]?.toUpperCase()}</div>
+              <span style={{ color: '#374151', fontWeight: 500 }}>{user.name?.split(' ')[0]}</span>
+              <span style={{ color: '#9ca3af', fontSize: 10 }}>▾</span>
+            </button>
+            {menuOpen && (
+              <div style={{
+                position: 'absolute', right: 0, top: 'calc(100% + 8px)', minWidth: 180,
+                background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.1)', zIndex: 200, overflow: 'hidden'
+              }} onMouseLeave={() => setMenuOpen(false)}>
+                {[
+                  { to: '/profile', label: '👤 My Profile' },
+                  { to: '/bookmarks', label: '🔖 Bookmarks' },
+                  { to: '/report', label: '+ Report Issue' },
+                  ...(user.role === 'admin' ? [{ to: '/admin', label: '⚙️ Admin Panel' }, { to: '/admin/analytics', label: '📊 Analytics' }] : []),
+                ].map(({ to, label }) => (
+                  <Link key={to} to={to} onClick={() => setMenuOpen(false)}
+                    style={{ display: 'block', padding: '10px 16px', fontSize: 13, color: '#374151', textDecoration: 'none', borderBottom: '1px solid #f9fafb' }}
+                    onMouseEnter={e => e.target.style.background = '#f9fafb'}
+                    onMouseLeave={e => e.target.style.background = 'transparent'}>
+                    {label}
+                  </Link>
+                ))}
+                <button onClick={() => { logout(); setMenuOpen(false); }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: 13, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>
+                  🚪 Sign Out
+                </button>
+              </div>
             )}
           </div>
-        </div>
-      )}
-
-      <style>{`
-        @media (max-width: 768px) {
-          .nav-desktop  { display: none !important; }
-          .nav-hamburger { display: flex !important; }
-        }
-      `}</style>
+        ) : (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link to="/login" style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #e5e7eb', textDecoration: 'none', fontSize: 13, color: '#374151' }}>Login</Link>
+            <Link to="/register" style={{ padding: '7px 14px', borderRadius: 8, background: '#4f46e5', color: '#fff', textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>Sign Up</Link>
+          </div>
+        )}
+      </div>
     </nav>
   );
 }

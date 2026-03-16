@@ -1,205 +1,232 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { adminAPI } from '../../api';
-import { useAuth } from '../../context/AuthContext';
-import AdminLayout from './AdminLayout';
-import toast from 'react-hot-toast';
+import { useState, useEffect } from 'react';
+import api from '../../api';
+
+const ROLE_COLORS = { admin: '#7c3aed', moderator: '#2563eb', user: '#6b7280' };
 
 export default function AdminUsers() {
-  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [pages, setPages] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
-  const [detailModal, setDetailModal] = useState(null);
-  const [detailData, setDetailData] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [banModal, setBanModal] = useState(null);
+  const [banReason, setBanReason] = useState('');
+  const LIMIT = 20;
 
-  const fetchUsers = useCallback(async () => {
+  const load = () => {
     setLoading(true);
-    try {
-      const params = { page, limit: 15 };
-      if (search) params.search = search;
-      if (roleFilter) params.role = roleFilter;
-      const res = await adminAPI.getUsers(params);
-      setUsers(res.data.users);
-      setTotal(res.data.total);
-      setPages(res.data.pages);
-    } catch { toast.error('Failed to load users'); }
-    finally { setLoading(false); }
-  }, [page, search, roleFilter]);
-
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
-
-  const handleRoleToggle = async (user) => {
-    if (user._id === currentUser.id) return toast.error("Can't change your own role");
-    const newRole = user.role === 'admin' ? 'user' : 'admin';
-    try {
-      await adminAPI.updateUserRole(user._id, newRole);
-      toast.success(`${user.name} is now ${newRole}`);
-      fetchUsers();
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
+    const params = new URLSearchParams({ page, limit: LIMIT });
+    if (search) params.set('search', search);
+    if (roleFilter) params.set('role', roleFilter);
+    api.get(`/admin/users?${params}`)
+      .then(r => { setUsers(r.data.users); setTotal(r.data.total); })
+      .finally(() => setLoading(false));
   };
 
-  const handleDelete = async (user) => {
-    if (user._id === currentUser.id) return toast.error("Can't delete yourself");
-    if (!window.confirm(`Delete user "${user.name}"? This cannot be undone.`)) return;
-    try {
-      await adminAPI.deleteUser(user._id);
-      toast.success('User deleted');
-      fetchUsers();
-    } catch { toast.error('Failed'); }
+  useEffect(() => { load(); }, [page, roleFilter]);
+  useEffect(() => { const t = setTimeout(load, 350); return () => clearTimeout(t); }, [search]);
+
+  const changeRole = async (userId, role) => {
+    await api.patch(`/admin/users/${userId}/role`, { role });
+    load();
   };
 
-  const openDetail = async (user) => {
-    setDetailModal(user);
-    setDetailData(null);
-    setDetailLoading(true);
-    try {
-      const res = await adminAPI.getUser(user._id);
-      setDetailData(res.data);
-    } catch { toast.error('Failed to load user details'); }
-    finally { setDetailLoading(false); }
+  const toggleBan = async () => {
+    const user = banModal;
+    if (user.isBanned) {
+      await api.patch(`/admin/users/${user._id}/unban`);
+    } else {
+      await api.patch(`/admin/users/${user._id}/ban`, { reason: banReason });
+    }
+    setBanModal(null); setBanReason('');
+    load();
   };
 
-  const timeAgo = (d) => { const days = Math.floor((Date.now() - new Date(d)) / 86400000); return days === 0 ? 'Today' : `${days}d ago`; };
+  const pages = Math.ceil(total / LIMIT);
 
   return (
-    <AdminLayout>
-      <div style={{ padding: '32px 24px' }}>
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 11, color: '#888', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>Admin / Users</div>
-          <h1 style={{ fontSize: 'clamp(22px,3vw,34px)' }}>User Management <span style={{ fontSize: 16, color: '#888', fontWeight: 400 }}>({total})</span></h1>
-        </div>
-
-        {/* Filters */}
-        <div style={{ background: 'var(--white)', border: '2px solid var(--ink)', padding: 16, marginBottom: 20, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <input placeholder="Search name or email..." value={search} onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && fetchUsers()}
-            style={{ flex: '1 1 200px', padding: '8px 12px', border: '2px solid var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--paper)' }} />
-          <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
-            style={{ flex: '0 0 130px', padding: '8px 12px', border: '2px solid var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--paper)' }}>
-            <option value="">All Roles</option>
-            <option value="user">User</option>
-            <option value="admin">Admin</option>
-          </select>
-          <button onClick={fetchUsers} className="btn btn-primary btn-sm">Filter</button>
-        </div>
-
-        {/* Table */}
-        <div style={{ background: 'var(--white)', border: '2px solid var(--ink)', overflowX: 'auto' }}>
-          {loading ? (
-            <div className="loading"><div className="spinner" /></div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
-              <thead>
-                <tr style={{ background: 'var(--ink)', color: 'var(--paper)' }}>
-                  {['User', 'Email', 'Role', 'Joined', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u, i) => (
-                  <tr key={u._id} style={{ borderBottom: '1px solid #eee', background: i % 2 === 0 ? 'white' : '#fafaf8' }}>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 34, height: 34, background: u.role === 'admin' ? '#e8a020' : '#0a0a0f', color: u.role === 'admin' ? '#0a0a0f' : '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15, flexShrink: 0 }}>
-                          {u.name.charAt(0).toUpperCase()}
-                        </div>
-                        <span style={{ fontSize: 14, fontWeight: 600 }}>
-                          {u.name}
-                          {u._id === currentUser.id && <span style={{ fontSize: 10, background: '#eee', padding: '1px 6px', marginLeft: 6 }}>YOU</span>}
-                        </span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: 13, color: '#555' }}>{u.email}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{
-                        padding: '3px 10px', fontSize: 11, fontWeight: 700,
-                        background: u.role === 'admin' ? '#e8a020' : '#eee',
-                        color: u.role === 'admin' ? '#0a0a0f' : '#555'
-                      }}>{u.role.toUpperCase()}</span>
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: '#888' }}>{timeAgo(u.createdAt)}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <button onClick={() => openDetail(u)} className="btn btn-sm" style={{ fontSize: 10, padding: '4px 10px' }}>View</button>
-                        <button onClick={() => handleRoleToggle(u)} className="btn btn-sm btn-amber" style={{ fontSize: 10, padding: '4px 10px' }}
-                          disabled={u._id === currentUser.id}>
-                          {u.role === 'admin' ? '→ User' : '→ Admin'}
-                        </button>
-                        <button onClick={() => handleDelete(u)} className="btn btn-sm btn-red" style={{ fontSize: 10, padding: '4px 10px' }}
-                          disabled={u._id === currentUser.id}>Del</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {!loading && users.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '48px', color: '#aaa', fontSize: 14 }}>No users found</div>
-          )}
-        </div>
-
-        {/* Pagination */}
-        {pages > 1 && (
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 20 }}>
-            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="btn btn-sm">← Prev</button>
-            <span style={{ padding: '6px 14px', border: '2px solid var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>{page} / {pages}</span>
-            <button disabled={page === pages} onClick={() => setPage(p => p + 1)} className="btn btn-sm">Next →</button>
-          </div>
-        )}
+    <div style={{ padding: '32px 40px', maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>User Management</h1>
+        <p style={{ color: '#888', margin: '4px 0 0', fontSize: 14 }}>{total} registered users</p>
       </div>
 
-      {/* User Detail Modal */}
-      {detailModal && (
-        <div className="modal-overlay" onClick={() => setDetailModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
-            <div className="modal-header">
-              <h2 style={{ fontSize: 20 }}>User Profile</h2>
-              <button className="modal-close" onClick={() => setDetailModal(null)}>×</button>
-            </div>
-            {detailLoading ? (
-              <div className="loading"><div className="spinner" /></div>
-            ) : detailData ? (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, padding: 16, background: '#f9f9f7', border: '1px solid #ddd' }}>
-                  <div style={{ width: 56, height: 56, background: detailData.user.role === 'admin' ? '#e8a020' : '#0a0a0f', color: detailData.user.role === 'admin' ? '#0a0a0f' : '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 24 }}>
-                    {detailData.user.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 20 }}>{detailData.user.name}</div>
-                    <div style={{ fontSize: 13, color: '#666' }}>{detailData.user.email}</div>
-                    <div style={{ marginTop: 4 }}>
-                      <span style={{ padding: '2px 8px', fontSize: 10, fontWeight: 700, background: detailData.user.role === 'admin' ? '#e8a020' : '#eee' }}>
-                        {detailData.user.role.toUpperCase()}
-                      </span>
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+        <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
+          placeholder="Search name or email…"
+          style={{ flex: 1, border: '1.5px solid #e5e0d8', borderRadius: 8, padding: '9px 14px', fontSize: 14 }} />
+        <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }}
+          style={{ border: '1.5px solid #e5e0d8', borderRadius: 8, padding: '9px 12px', fontSize: 13 }}>
+          <option value="">All Roles</option>
+          <option value="admin">Admin</option>
+          <option value="moderator">Moderator</option>
+          <option value="user">User</option>
+        </select>
+      </div>
+
+      {/* Table */}
+      <div style={{ background: '#fff', border: '1.5px solid #e5e0d8', borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: '#fdfcfb', borderBottom: '1.5px solid #e5e0d8' }}>
+              {['User', 'Role', 'Reputation', 'Issues', 'Resolved', 'Joined', 'Status', 'Actions'].map(h => (
+                <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#888', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading
+              ? <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#aaa' }}>Loading…</td></tr>
+              : users.length === 0
+              ? <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#aaa' }}>No users found</td></tr>
+              : users.map((u, i) => (
+                <tr key={u._id} style={{ borderBottom: i < users.length - 1 ? '1px solid #f0ede8' : 'none',
+                  background: u.isBanned ? '#fff5f5' : 'transparent' }}>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{u.name}</div>
+                    <div style={{ fontSize: 12, color: '#888' }}>{u.email}</div>
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <select value={u.role} onChange={e => changeRole(u._id, e.target.value)}
+                      style={{ border: '1.5px solid #e5e0d8', borderRadius: 6, padding: '4px 8px', fontSize: 12,
+                        color: ROLE_COLORS[u.role], fontWeight: 600, cursor: 'pointer' }}>
+                      <option value="user">User</option>
+                      <option value="moderator">Moderator</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontSize: 14 }}>
+                    <span style={{ color: '#d97706', fontWeight: 600 }}>⭐ {u.reputation || 0}</span>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontSize: 14, color: '#555' }}>{u.stats?.issuesReportedCount || 0}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 14, color: '#059669', fontWeight: 500 }}>{u.stats?.issuesResolvedCount || 0}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 12, color: '#888' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
+                  <td style={{ padding: '12px 16px' }}>
+                    {u.isBanned
+                      ? <span style={{ background: '#fff1f2', color: '#be123c', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>BANNED</span>
+                      : <span style={{ background: '#f0fdf4', color: '#15803d', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>ACTIVE</span>}
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => setSelected(u)}
+                        style={{ border: '1.5px solid #e5e0d8', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', background: '#fff' }}>
+                        View
+                      </button>
+                      <button onClick={() => setBanModal(u)}
+                        style={{ border: `1.5px solid ${u.isBanned ? '#bbf7d0' : '#fecdd3'}`,
+                          background: u.isBanned ? '#f0fdf4' : '#fff1f2',
+                          color: u.isBanned ? '#15803d' : '#be123c',
+                          borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>
+                        {u.isBanned ? 'Unban' : 'Ban'}
+                      </button>
                     </div>
-                  </div>
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {pages > 1 && (
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            style={{ padding: '7px 14px', borderRadius: 7, border: '1.5px solid #e5e0d8', background: '#fff', cursor: page === 1 ? 'not-allowed' : 'pointer' }}>← Prev</button>
+          {Array.from({ length: Math.min(5, pages) }, (_, i) => i + 1).map(p => (
+            <button key={p} onClick={() => setPage(p)}
+              style={{ padding: '7px 12px', borderRadius: 7, border: '1.5px solid', borderColor: page === p ? '#2563eb' : '#e5e0d8',
+                background: page === p ? '#2563eb' : '#fff', color: page === p ? '#fff' : '#333', cursor: 'pointer', minWidth: 36 }}>
+              {p}
+            </button>
+          ))}
+          <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}
+            style={{ padding: '7px 14px', borderRadius: 7, border: '1.5px solid #e5e0d8', background: '#fff', cursor: page === pages ? 'not-allowed' : 'pointer' }}>Next →</button>
+        </div>
+      )}
+
+      {/* User Detail Modal */}
+      {selected && (
+        <div style={{ position: 'fixed', inset: 0, background: '#00000060', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setSelected(null)}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 32, width: 480, maxHeight: '80vh', overflowY: 'auto' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: 20 }}>{selected.name}</h2>
+              <button onClick={() => setSelected(null)} style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer', color: '#888' }}>×</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              {[
+                ['Email', selected.email],
+                ['Role', selected.role],
+                ['Reputation', `⭐ ${selected.reputation || 0}`],
+                ['Joined', new Date(selected.createdAt).toLocaleDateString()],
+                ['Issues Reported', selected.stats?.issuesReportedCount || 0],
+                ['Issues Resolved', selected.stats?.issuesResolvedCount || 0],
+                ['Comments', selected.stats?.commentsCount || 0],
+                ['Support Given', selected.stats?.totalSupportGiven || 0],
+                ['Neighborhood', selected.neighborhood || '—'],
+                ['Last Seen', selected.lastSeenAt ? new Date(selected.lastSeenAt).toLocaleDateString() : '—']
+              ].map(([k, v]) => (
+                <div key={k} style={{ background: '#fdfcfb', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>{k}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{v}</div>
                 </div>
-                <div style={{ marginBottom: 16 }}>
-                  <h4 style={{ fontSize: 14, marginBottom: 12 }}>Issues Reported ({detailData.issues?.length || 0})</h4>
-                  <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {detailData.issues?.slice(0, 10).map(issue => (
-                      <div key={issue._id} style={{ padding: '8px 12px', background: '#f5f5f5', display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{issue.title}</span>
-                        <span style={{ fontSize: 11, color: '#888', flexShrink: 0, marginLeft: 8 }}>{issue.status}</span>
-                      </div>
-                    ))}
-                    {(!detailData.issues || detailData.issues.length === 0) && (
-                      <div style={{ color: '#aaa', fontSize: 13 }}>No issues reported yet</div>
-                    )}
-                  </div>
+              ))}
+            </div>
+            {selected.badges?.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Badges</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {selected.badges.map(b => (
+                    <span key={b.id} style={{ background: '#fdf9c4', border: '1px solid #fde047', borderRadius: 20, padding: '3px 12px', fontSize: 13 }}>
+                      {b.icon} {b.label}
+                    </span>
+                  ))}
                 </div>
               </div>
-            ) : null}
+            )}
+            {selected.bio && (
+              <div style={{ marginTop: 16, background: '#f8f7f5', borderRadius: 8, padding: '10px 14px', fontSize: 14, color: '#555' }}>
+                {selected.bio}
+              </div>
+            )}
           </div>
         </div>
       )}
-    </AdminLayout>
+
+      {/* Ban Modal */}
+      {banModal && (
+        <div style={{ position: 'fixed', inset: 0, background: '#00000060', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setBanModal(null)}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 400 }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 18 }}>{banModal.isBanned ? 'Unban' : 'Ban'} {banModal.name}?</h3>
+            {!banModal.isBanned && (
+              <>
+                <p style={{ fontSize: 14, color: '#666', marginBottom: 12 }}>Provide a reason (optional):</p>
+                <textarea value={banReason} onChange={e => setBanReason(e.target.value)} rows={3}
+                  placeholder="Reason for ban…"
+                  style={{ width: '100%', border: '1.5px solid #e5e0d8', borderRadius: 8, padding: '9px 12px', fontSize: 14, boxSizing: 'border-box', resize: 'none' }} />
+              </>
+            )}
+            {banModal.isBanned && <p style={{ fontSize: 14, color: '#666', marginBottom: 20 }}>This will restore the user's access to the platform.</p>}
+            <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+              <button onClick={toggleBan}
+                style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none',
+                  background: banModal.isBanned ? '#059669' : '#dc2626', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+                {banModal.isBanned ? 'Unban User' : 'Ban User'}
+              </button>
+              <button onClick={() => setBanModal(null)}
+                style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1.5px solid #e5e0d8', background: '#fff', cursor: 'pointer', fontSize: 14 }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

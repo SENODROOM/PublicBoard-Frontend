@@ -22,7 +22,6 @@ export default function AdminDonations() {
       setDonations(res.data.donations);
       setTotal(res.data.total);
       setPages(res.data.pages);
-      // Compute totals from all completed
       const completed = res.data.donations.filter(d => d.status === 'completed');
       const sum = completed.reduce((acc, d) => acc + d.amount, 0);
       setTotalRaised(sum);
@@ -33,8 +32,18 @@ export default function AdminDonations() {
 
   useEffect(() => { fetchDonations(); }, [fetchDonations]);
 
-  const fmt = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const handleExportCSV = async () => {
+    try {
+      const res = await adminAPI.exportDonationsCSV();
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url; a.download = 'donations.csv'; a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success('CSV downloaded');
+    } catch { toast.error('Export failed'); }
+  };
 
+  const fmt = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const STATUS_COLORS = { completed: '#2a7a4a', pending: '#e8a020', failed: '#c83232', refunded: '#6a3a9a' };
 
   return (
@@ -42,7 +51,10 @@ export default function AdminDonations() {
       <div style={{ padding: '32px 24px' }}>
         <div style={{ marginBottom: 28 }}>
           <div style={{ fontSize: 11, color: '#888', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>Admin / Donations</div>
-          <h1 style={{ fontSize: 'clamp(22px,3vw,34px)' }}>Donation Management</h1>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <h1 style={{ fontSize: 'clamp(22px,3vw,34px)' }}>Donation Management</h1>
+            <button onClick={handleExportCSV} className="btn btn-sm btn-green" style={{ fontSize: 11 }}>⬇ Export CSV</button>
+          </div>
         </div>
 
         {/* Stats */}

@@ -4,7 +4,9 @@ import AdminLayout from './AdminLayout';
 import toast from 'react-hot-toast';
 
 const STATUSES = ['Open', 'In Progress', 'Pending Review', 'Resolved'];
+const PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
 const STATUS_COLORS = { 'Open': '#c83232', 'In Progress': '#1a4a8a', 'Pending Review': '#6a3a9a', 'Resolved': '#2a7a4a' };
+const PRIORITY_COLORS = { 'Low': '#888', 'Medium': '#1a4a8a', 'High': '#e8a020', 'Critical': '#c83232' };
 const CATEGORIES = ['Infrastructure', 'Safety', 'Sanitation', 'Community Resources', 'Environment', 'Transportation', 'Other'];
 
 export default function AdminIssues() {
@@ -14,9 +16,10 @@ export default function AdminIssues() {
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState([]);
-  const [filters, setFilters] = useState({ status: '', category: '', search: '', sort: '-createdAt' });
+  const [filters, setFilters] = useState({ status: '', category: '', priority: '', search: '', sort: '-createdAt' });
   const [editModal, setEditModal] = useState(null);
   const [editStatus, setEditStatus] = useState('');
+  const [editPriority, setEditPriority] = useState('');
   const [editMessage, setEditMessage] = useState('');
   const [updating, setUpdating] = useState(false);
 
@@ -58,15 +61,26 @@ export default function AdminIssues() {
     catch { toast.error('Failed'); }
   };
 
-  const openEdit = (issue) => { setEditModal(issue); setEditStatus(issue.status); setEditMessage(''); };
+  const openEdit = (issue) => { setEditModal(issue); setEditStatus(issue.status); setEditPriority(issue.priority || 'Medium'); setEditMessage(''); };
 
   const handleUpdate = async () => {
     setUpdating(true);
     try {
-      await adminAPI.updateIssue(editModal._id, { status: editStatus, message: editMessage });
+      await adminAPI.updateIssue(editModal._id, { status: editStatus, priority: editPriority, message: editMessage });
       toast.success('Updated!'); setEditModal(null); fetchIssues();
     } catch { toast.error('Failed'); }
     finally { setUpdating(false); }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const res = await adminAPI.exportIssuesCSV();
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url; a.download = 'issues.csv'; a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success('CSV downloaded');
+    } catch { toast.error('Export failed'); }
   };
 
   const timeAgo = (d) => { const days = Math.floor((Date.now() - new Date(d)) / 86400000); return days === 0 ? 'Today' : `${days}d ago`; };
@@ -78,6 +92,7 @@ export default function AdminIssues() {
           <div style={{ fontSize: 11, color: '#888', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>Admin / Issues</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <h1 style={{ fontSize: 'clamp(22px,3vw,34px)' }}>Issue Management <span style={{ fontSize: 16, color: '#888', fontWeight: 400 }}>({total})</span></h1>
+            <button onClick={handleExportCSV} className="btn btn-sm btn-green" style={{ fontSize: 11 }}>⬇ Export CSV</button>
           </div>
         </div>
 
@@ -85,14 +100,19 @@ export default function AdminIssues() {
         <div style={{ background: 'var(--white)', border: '2px solid var(--ink)', padding: 16, marginBottom: 20, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <input placeholder="Search..." value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
             onKeyDown={e => e.key === 'Enter' && fetchIssues()}
-            style={{ flex: '1 1 180px', padding: '8px 12px', border: '2px solid var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--paper)' }} />
+            style={{ flex: '1 1 160px', padding: '8px 12px', border: '2px solid var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--paper)' }} />
           <select value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}
-            style={{ flex: '0 0 140px', padding: '8px 12px', border: '2px solid var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--paper)' }}>
+            style={{ flex: '0 0 130px', padding: '8px 12px', border: '2px solid var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--paper)' }}>
             <option value="">All Status</option>
             {STATUSES.map(s => <option key={s}>{s}</option>)}
           </select>
+          <select value={filters.priority} onChange={e => setFilters(f => ({ ...f, priority: e.target.value }))}
+            style={{ flex: '0 0 120px', padding: '8px 12px', border: '2px solid var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--paper)' }}>
+            <option value="">All Priority</option>
+            {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+          </select>
           <select value={filters.category} onChange={e => setFilters(f => ({ ...f, category: e.target.value }))}
-            style={{ flex: '0 0 160px', padding: '8px 12px', border: '2px solid var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--paper)' }}>
+            style={{ flex: '0 0 150px', padding: '8px 12px', border: '2px solid var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12, background: 'var(--paper)' }}>
             <option value="">All Categories</option>
             {CATEGORIES.map(c => <option key={c}>{c}</option>)}
           </select>
@@ -117,14 +137,13 @@ export default function AdminIssues() {
           {loading ? (
             <div className="loading"><div className="spinner" /></div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
               <thead>
                 <tr style={{ background: 'var(--ink)', color: 'var(--paper)' }}>
                   <th style={{ padding: '12px 16px', textAlign: 'left', width: 40 }}>
-                    <input type="checkbox" checked={selected.length === issues.length && issues.length > 0} onChange={toggleAll}
-                      style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                    <input type="checkbox" checked={selected.length === issues.length && issues.length > 0} onChange={toggleAll} style={{ width: 16, height: 16, cursor: 'pointer' }} />
                   </th>
-                  {['Title', 'Category', 'Status', 'Reporter', 'Support', 'Date', 'Actions'].map(h => (
+                  {['Title', 'Category', 'Priority', 'Status', 'Reporter', '▲', '💬', 'Date', 'Actions'].map(h => (
                     <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -133,15 +152,28 @@ export default function AdminIssues() {
                 {issues.map((issue, i) => (
                   <tr key={issue._id} style={{ borderBottom: '1px solid #eee', background: selected.includes(issue._id) ? '#fffbe8' : i % 2 === 0 ? 'white' : '#fafaf8' }}>
                     <td style={{ padding: '10px 16px' }}>
-                      <input type="checkbox" checked={selected.includes(issue._id)} onChange={() => toggleSelect(issue._id)}
-                        style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                      <input type="checkbox" checked={selected.includes(issue._id)} onChange={() => toggleSelect(issue._id)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
                     </td>
                     <td style={{ padding: '10px 16px', maxWidth: 200 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.title}</div>
                       <div style={{ fontSize: 11, color: '#888' }}>📍 {issue.location}</div>
+                      {issue.tags?.length > 0 && (
+                        <div style={{ display: 'flex', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
+                          {issue.tags.slice(0, 2).map((t, j) => <span key={j} style={{ fontSize: 9, color: '#aaa', fontFamily: 'var(--font-mono)' }}>#{t}</span>)}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       <span style={{ fontSize: 11, background: '#eee', padding: '2px 8px', fontFamily: 'var(--font-mono)' }}>{issue.category}</span>
+                    </td>
+                    <td style={{ padding: '10px 16px' }}>
+                      <span style={{
+                        fontSize: 11, padding: '3px 8px',
+                        background: (PRIORITY_COLORS[issue.priority] || '#888') + '22',
+                        color: PRIORITY_COLORS[issue.priority] || '#888',
+                        border: `1px solid ${PRIORITY_COLORS[issue.priority] || '#888'}`,
+                        fontWeight: 700, whiteSpace: 'nowrap'
+                      }}>{issue.priority || 'Medium'}</span>
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       <span style={{ fontSize: 11, padding: '3px 8px', border: `1.5px solid ${STATUS_COLORS[issue.status]}`, color: STATUS_COLORS[issue.status], fontWeight: 700, whiteSpace: 'nowrap' }}>
@@ -150,6 +182,7 @@ export default function AdminIssues() {
                     </td>
                     <td style={{ padding: '10px 16px', fontSize: 13 }}>{issue.reporter?.name || '—'}</td>
                     <td style={{ padding: '10px 16px', fontSize: 13, textAlign: 'center' }}>{issue.supportCount || 0}</td>
+                    <td style={{ padding: '10px 16px', fontSize: 13, textAlign: 'center' }}>{issue.comments?.length || 0}</td>
                     <td style={{ padding: '10px 16px', fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>{timeAgo(issue.createdAt)}</td>
                     <td style={{ padding: '10px 16px' }}>
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -162,15 +195,16 @@ export default function AdminIssues() {
               </tbody>
             </table>
           )}
+          {!loading && issues.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '48px', color: '#aaa', fontSize: 14 }}>No issues found</div>
+          )}
         </div>
 
         {/* Pagination */}
         {pages > 1 && (
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 20 }}>
             <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="btn btn-sm">← Prev</button>
-            <span style={{ padding: '6px 14px', border: '2px solid var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-              {page} / {pages}
-            </span>
+            <span style={{ padding: '6px 14px', border: '2px solid var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>{page} / {pages}</span>
             <button disabled={page === pages} onClick={() => setPage(p => p + 1)} className="btn btn-sm">Next →</button>
           </div>
         )}
@@ -185,11 +219,19 @@ export default function AdminIssues() {
               <button className="modal-close" onClick={() => setEditModal(null)}>×</button>
             </div>
             <div style={{ marginBottom: 16, fontSize: 14, color: '#555', fontStyle: 'italic' }}>{editModal.title}</div>
-            <div className="form-group">
-              <label>Status</label>
-              <select value={editStatus} onChange={e => setEditStatus(e.target.value)}>
-                {STATUSES.map(s => <option key={s}>{s}</option>)}
-              </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="form-group">
+                <label>Status</label>
+                <select value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                  {STATUSES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Priority</label>
+                <select value={editPriority} onChange={e => setEditPriority(e.target.value)}>
+                  {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+                </select>
+              </div>
             </div>
             <div className="form-group">
               <label>Admin Note (optional)</label>

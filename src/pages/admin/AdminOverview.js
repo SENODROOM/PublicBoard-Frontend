@@ -8,15 +8,10 @@ const STATUS_COLORS = {
   'Open': '#c83232', 'In Progress': '#1a4a8a',
   'Pending Review': '#6a3a9a', 'Resolved': '#2a7a4a'
 };
+const PRIORITY_COLORS = { 'Low': '#888', 'Medium': '#1a4a8a', 'High': '#e8a020', 'Critical': '#c83232' };
 
 const StatBox = ({ num, label, color = 'var(--ink)', sub }) => (
-  <div style={{
-    padding: '20px 24px',
-    background: color,
-    color: 'white',
-    border: '2px solid var(--ink)',
-    boxShadow: '3px 3px 0 var(--ink)'
-  }}>
+  <div style={{ padding: '20px 24px', background: color, color: 'white', border: '2px solid var(--ink)', boxShadow: '3px 3px 0 var(--ink)' }}>
     <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 800, lineHeight: 1 }}>{num}</div>
     <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 6, opacity: 0.85 }}>{label}</div>
     {sub && <div style={{ fontSize: 11, marginTop: 4, opacity: 0.7 }}>{sub}</div>}
@@ -34,13 +29,9 @@ export default function AdminOverview() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return (
-    <AdminLayout>
-      <div className="loading"><div className="spinner" />Loading overview...</div>
-    </AdminLayout>
-  );
+  if (loading) return <AdminLayout><div className="loading"><div className="spinner" />Loading overview...</div></AdminLayout>;
 
-  const { stats, recentIssues, recentUsers, recentDonations, categoryBreakdown } = data;
+  const { stats, recentIssues, recentUsers, recentDonations, categoryBreakdown, priorityBreakdown } = data;
   const maxCat = Math.max(...(categoryBreakdown?.map(c => c.count) || [1]));
 
   const timeAgo = (d) => {
@@ -48,6 +39,10 @@ export default function AdminOverview() {
     const days = Math.floor(diff / 86400000);
     return days === 0 ? 'Today' : days === 1 ? 'Yesterday' : `${days}d ago`;
   };
+
+  // Map priority breakdown to ordered array
+  const priorityOrder = ['Critical', 'High', 'Medium', 'Low'];
+  const priorityMap = Object.fromEntries((priorityBreakdown || []).map(p => [p._id, p.count]));
 
   return (
     <AdminLayout>
@@ -68,8 +63,8 @@ export default function AdminOverview() {
           <StatBox num={`$${stats.totalRaised?.toLocaleString() || 0}`} label="Total Raised" color="#2a7a4a" sub={`${stats.totalDonations} donations`} />
         </div>
 
-        {/* Two columns */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24, marginBottom: 24 }}>
+        {/* Three-column breakdown */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24, marginBottom: 24 }}>
           {/* Category breakdown */}
           <div style={{ background: 'var(--white)', border: '2px solid var(--ink)', padding: 24 }}>
             <h3 style={{ fontSize: 16, marginBottom: 20, display: 'flex', justifyContent: 'space-between' }}>
@@ -116,6 +111,37 @@ export default function AdminOverview() {
               ))}
             </div>
           </div>
+
+          {/* Priority breakdown */}
+          <div style={{ background: 'var(--white)', border: '2px solid var(--ink)', padding: 24 }}>
+            <h3 style={{ fontSize: 16, marginBottom: 20 }}>Priority Distribution</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {priorityOrder.map(p => {
+                const count = priorityMap[p] || 0;
+                const maxP = Math.max(...Object.values(priorityMap), 1);
+                return (
+                  <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 14, height: 14, background: PRIORITY_COLORS[p], border: '2px solid var(--ink)', flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{p}</span>
+                        <span style={{ fontWeight: 700 }}>{count}</span>
+                      </div>
+                      <div style={{ height: 4, background: '#eee', marginTop: 3 }}>
+                        <div style={{ height: '100%', background: PRIORITY_COLORS[p], width: `${(count / maxP) * 100}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Critical alert if any */}
+              {(priorityMap['Critical'] || 0) > 0 && (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: '#ffeaea', border: '1px solid #c83232', fontSize: 12, color: '#c83232', fontFamily: 'var(--font-mono)' }}>
+                  ⚠ {priorityMap['Critical']} critical issue{priorityMap['Critical'] !== 1 ? 's' : ''} need attention!
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Three panels — recent data */}
@@ -130,7 +156,12 @@ export default function AdminOverview() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{issue.title}</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{issue.reporter?.name} · {timeAgo(issue.createdAt)}</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2, display: 'flex', gap: 8 }}>
+                      <span>{issue.reporter?.name}</span>
+                      <span>·</span>
+                      <span>{timeAgo(issue.createdAt)}</span>
+                      {issue.priority === 'Critical' && <span style={{ color: '#c83232', fontWeight: 700 }}>🔴 CRIT</span>}
+                    </div>
                   </div>
                   <span style={{ fontSize: 10, padding: '2px 6px', border: `1px solid ${STATUS_COLORS[issue.status]}`, color: STATUS_COLORS[issue.status], flexShrink: 0 }}>{issue.status}</span>
                 </div>
