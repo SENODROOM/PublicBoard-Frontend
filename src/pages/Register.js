@@ -32,9 +32,17 @@ export default function Register() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <div style={{ width: 56, height: 56, background: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', border: '2px solid var(--amber)' }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 22, color: 'var(--amber)' }}>PB</span>
-          </div>
+          <img 
+            src="/logo.png" 
+            alt="PublicBoard" 
+            style={{ 
+              width: 56, 
+              height: 56, 
+              objectFit: 'contain',
+              margin: '0 auto 16px',
+              border: '2px solid var(--amber)'
+            }} 
+          />
           <h1 style={{ fontSize: 32, marginBottom: 8 }}>Join PublicBoard</h1>
           <p style={{ color: '#777', fontSize: 14 }}>Create an account to report and track community issues</p>
         </div>

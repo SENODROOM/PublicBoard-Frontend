@@ -1,52 +1,92 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI } from '../api';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import { authAPI } from "../api";
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Verify token on mount
   useEffect(() => {
-    const token = localStorage.getItem('pb_token');
-    if (token) {
-      authAPI.me()
-        .then(res => setUser(res.data.user))
-        .catch(() => {
-          localStorage.removeItem('pb_token');
-        })
-        .finally(() => setLoading(false));
-    } else {
+    const token = localStorage.getItem("pb_token");
+    if (!token) {
       setLoading(false);
+      return;
     }
+    authAPI
+      .me()
+      .then((r) => setUser(r.data.user))
+      .catch(() => {
+        localStorage.removeItem("pb_token");
+        localStorage.removeItem("pb_refresh");
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const login = async (email, password) => {
-    const res = await authAPI.login({ email, password });
-    localStorage.setItem('pb_token', res.data.token);
-    setUser(res.data.user);   // { id, name, email, role }
-    return res.data.user;
-  };
+  const login = useCallback(async (email, password) => {
+    const r = await authAPI.login({ email, password });
+    localStorage.setItem("pb_token", r.data.token);
+    localStorage.setItem("pb_refresh", r.data.refreshToken);
+    setUser(r.data.user);
+    return r.data.user;
+  }, []);
 
-  const register = async (name, email, password) => {
-    const res = await authAPI.register({ name, email, password });
-    localStorage.setItem('pb_token', res.data.token);
-    setUser(res.data.user);
-    return res.data.user;
-  };
+  const register = useCallback(
+    async (name, email, password, neighborhood = "") => {
+      const r = await authAPI.register({ name, email, password, neighborhood });
+      localStorage.setItem("pb_token", r.data.token);
+      localStorage.setItem("pb_refresh", r.data.refreshToken);
+      setUser(r.data.user);
+      return r.data.user;
+    },
+    [],
+  );
 
-  const logout = () => {
-    localStorage.removeItem('pb_token');
+  const logout = useCallback(() => {
+    localStorage.removeItem("pb_token");
+    localStorage.removeItem("pb_refresh");
     setUser(null);
-  };
+  }, []);
 
-  const isAdmin = user?.role === 'admin';
+  const updateProfile = useCallback(async (data) => {
+    const r = await authAPI.updateProfile(data);
+    setUser(r.data.user);
+    return r.data.user;
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const r = await authAPI.me();
+      setUser(r.data.user);
+    } catch (_) {}
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        updateProfile,
+        refreshUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => useContext(AuthContext);
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
+  return ctx;
+}

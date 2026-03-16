@@ -1,175 +1,420 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend
-} from 'recharts';
-import api from '../../api';
+import React, { useEffect, useState } from "react";
+import { analyticsAPI } from "../../api";
+import toast from "react-hot-toast";
 
-const PRIORITY_COLORS = { Critical: '#dc2626', High: '#d97706', Medium: '#2563eb', Low: '#6b7280' };
-const CATEGORY_COLORS = ['#2563eb','#7c3aed','#db2777','#059669','#d97706','#dc2626','#0891b2'];
+const RANGE_OPTIONS = [
+  { label: "7 days", value: 7 },
+  { label: "30 days", value: 30 },
+  { label: "90 days", value: 90 },
+];
 
-const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const BAR_COLORS = [
+  "#c83232",
+  "#1a4a8a",
+  "#2a7a4a",
+  "#e8a020",
+  "#6a3a9a",
+  "#888",
+  "#3a8a8a",
+];
 
-function StatCard({ label, value, sub, color = '#2563eb' }) {
+function MiniBar({ label, value, max, color = "var(--blue)" }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
-    <div style={{ background: '#fff', border: '1.5px solid #e5e0d8', borderRadius: 10, padding: '20px 24px', minWidth: 140 }}>
-      <div style={{ fontSize: 13, color: '#888', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 700, color }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>{sub}</div>}
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 8,
+      }}
+    >
+      <div
+        style={{
+          width: 130,
+          fontSize: 11,
+          fontFamily: "var(--font-mono)",
+          color: "#555",
+          flexShrink: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{ flex: 1, height: 14, background: "#eee", overflow: "hidden" }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: `${pct}%`,
+            background: color,
+            transition: "width 0.8s cubic-bezier(.4,0,.2,1)",
+          }}
+        />
+      </div>
+      <div
+        style={{
+          width: 28,
+          fontSize: 11,
+          fontFamily: "var(--font-mono)",
+          textAlign: "right",
+          flexShrink: 0,
+        }}
+      >
+        {value}
+      </div>
     </div>
+  );
+}
+
+function StatCard({ label, value, sub, color = "var(--ink)" }) {
+  return (
+    <div
+      style={{
+        background: "var(--white)",
+        border: "2px solid var(--ink)",
+        padding: "18px 20px",
+        boxShadow: "3px 3px 0 var(--ink)",
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 30,
+          fontWeight: 800,
+          color,
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </div>
+      <div
+        style={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          color: "#888",
+          marginTop: 6,
+        }}
+      >
+        {label}
+      </div>
+      {sub && (
+        <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>{sub}</div>
+      )}
+    </div>
+  );
+}
+
+function TrendLine({ data, width = 300, height = 60, color = "#1a4a8a" }) {
+  if (!data || data.length < 2) return null;
+  const vals = data.map((d) => d.created || d.count || 0);
+  const max = Math.max(...vals, 1);
+  const pts = vals
+    .map((v, i) => {
+      const x = (i / (vals.length - 1)) * (width - 20) + 10;
+      const y = height - 10 - (v / max) * (height - 20);
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  return (
+    <svg width={width} height={height} style={{ display: "block" }}>
+      <polyline
+        points={pts}
+        fill="none"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {vals.map((v, i) => {
+        const x = (i / (vals.length - 1)) * (width - 20) + 10;
+        const y = height - 10 - (v / max) * (height - 20);
+        return <circle key={i} cx={x} cy={y} r={3} fill={color} />;
+      })}
+    </svg>
   );
 }
 
 export default function AdminAnalytics() {
   const [data, setData] = useState(null);
-  const [range, setRange] = useState('30');
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState(30);
 
   useEffect(() => {
     setLoading(true);
-    api.get(`/analytics?range=${range}`)
-      .then(r => { setData(r.data); setLoading(false); })
-      .catch(() => setLoading(false));
+    analyticsAPI
+      .get(range)
+      .then((r) => setData(r.data))
+      .catch(() => toast.error("Failed to load analytics"))
+      .finally(() => setLoading(false));
   }, [range]);
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#888' }}>
-      Loading analytics…
-    </div>
-  );
-  if (!data) return <div style={{ padding: 40, color: '#888' }}>Failed to load analytics.</div>;
+  if (loading)
+    return (
+      <div style={{ padding: 32 }}>
+        <div className="loading">
+          <div className="spinner" />
+          Loading analytics…
+        </div>
+      </div>
+    );
 
-  const { issuesTrend, resolutionByCategory, topLocations, topNeighborhoods,
-    byDayOfWeek, byHour, topIssues, donationTrend, avgResolutionTime, categoryTrend } = data;
+  if (!data) return null;
 
-  const priorityBars = ['Critical','High','Medium','Low'].map(p => ({
-    name: p,
-    count: (data.priorityBreakdown || []).find(x => x._id === p)?.count || 0
-  }));
+  const maxDow = Math.max(...(data.byDayOfWeek || []).map((d) => d.count), 1);
+  const maxHour = Math.max(...(data.byHour || []).map((h) => h.count), 1);
+  const maxCat = Math.max(...(data.categoryTrend || []).map((c) => c.count), 1);
+  const maxLoc = Math.max(...(data.topLocations || []).map((l) => l.count), 1);
+  const avgHrs = data.avgResolutionTime?.avg || 0;
 
   return (
-    <div style={{ padding: '32px 40px', maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: "32px 24px", maxWidth: 1100 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          marginBottom: 28,
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>Analytics</h1>
-          <p style={{ color: '#888', margin: '4px 0 0', fontSize: 14 }}>Platform-wide insights and trends</p>
+          <div
+            style={{
+              fontSize: 10,
+              color: "#888",
+              fontFamily: "var(--font-mono)",
+              textTransform: "uppercase",
+              letterSpacing: "0.15em",
+              marginBottom: 4,
+            }}
+          >
+            Admin / Analytics
+          </div>
+          <h1 style={{ fontSize: "clamp(22px,3vw,34px)" }}>Analytics</h1>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {['7','30','90','365'].map(d => (
-            <button key={d} onClick={() => setRange(d)}
-              style={{ padding: '6px 14px', borderRadius: 6, border: '1.5px solid',
-                borderColor: range === d ? '#2563eb' : '#e5e0d8',
-                background: range === d ? '#2563eb' : '#fff',
-                color: range === d ? '#fff' : '#333',
-                fontWeight: range === d ? 600 : 400, cursor: 'pointer', fontSize: 13 }}>
-              {d}d
+        <div
+          style={{ display: "flex", gap: 0, border: "2px solid var(--ink)" }}
+        >
+          {RANGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setRange(opt.value)}
+              style={{
+                padding: "6px 16px",
+                border: "none",
+                cursor: "pointer",
+                background: range === opt.value ? "var(--ink)" : "var(--white)",
+                color: range === opt.value ? "#fff" : "var(--ink)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                letterSpacing: "0.05em",
+              }}
+            >
+              {opt.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* KPI Row */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 32 }}>
-        <StatCard label="Avg Resolution Time" value={avgResolutionTime.avg ? `${Math.round(avgResolutionTime.avg)}h` : '—'} sub="across resolved issues" color="#059669" />
-        <StatCard label="Fastest Resolve" value={avgResolutionTime.min ? `${Math.round(avgResolutionTime.min)}h` : '—'} sub="min resolution" color="#2563eb" />
-        <StatCard label="Issues Reported" value={issuesTrend.reduce((s, d) => s + d.created, 0)} sub={`last ${range} days`} />
-        <StatCard label="Issues Resolved" value={issuesTrend.reduce((s, d) => s + d.resolved, 0)} sub={`last ${range} days`} color="#7c3aed" />
-      </div>
-
-      {/* Issues Over Time */}
-      <div style={{ background: '#fff', border: '1.5px solid #e5e0d8', borderRadius: 12, padding: 24, marginBottom: 24 }}>
-        <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 600 }}>Issues Over Time</h3>
-        {issuesTrend.length === 0 ? <div style={{ color: '#aaa', textAlign: 'center', padding: 40 }}>No data in this range</div> : (
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={issuesTrend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0ede8" />
-              <XAxis dataKey="_id" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="created" stroke="#2563eb" strokeWidth={2} dot={false} name="Reported" />
-              <Line type="monotone" dataKey="resolved" stroke="#059669" strokeWidth={2} dot={false} name="Resolved" />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-
-      {/* Row: Category Breakdown + Resolution by Category */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
-        <div style={{ background: '#fff', border: '1.5px solid #e5e0d8', borderRadius: 12, padding: 24 }}>
-          <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 600 }}>By Category</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={categoryTrend} dataKey="count" nameKey="_id" cx="50%" cy="50%" outerRadius={75} label={({ _id, percent }) => `${_id} ${(percent*100).toFixed(0)}%`} labelLine={false}>
-                {categoryTrend.map((_, i) => <Cell key={i} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />)}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div style={{ background: '#fff', border: '1.5px solid #e5e0d8', borderRadius: 12, padding: 24 }}>
-          <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 600 }}>Avg Resolution Time by Category</h3>
-          {resolutionByCategory.length === 0
-            ? <div style={{ color: '#aaa', textAlign: 'center', padding: 40 }}>No resolved issues yet</div>
-            : <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={resolutionByCategory} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 11 }} unit="h" />
-                  <YAxis dataKey="_id" type="category" tick={{ fontSize: 11 }} width={110} />
-                  <Tooltip formatter={v => `${Math.round(v)}h`} />
-                  <Bar dataKey="avgHours" fill="#7c3aed" radius={[0,4,4,0]} name="Avg Hours" />
-                </BarChart>
-              </ResponsiveContainer>
+      {/* Top stat cards */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gap: 14,
+          marginBottom: 28,
+        }}
+      >
+        <StatCard
+          label="Avg Resolution"
+          value={
+            avgHrs < 24
+              ? `${Math.round(avgHrs)}h`
+              : `${Math.round(avgHrs / 24)}d`
           }
-        </div>
+          sub={`Min: ${Math.round(data.avgResolutionTime?.min || 0)}h`}
+          color="var(--green)"
+        />
+        <StatCard
+          label="Issues Reported"
+          value={(data.issuesTrend || []).reduce((s, d) => s + d.created, 0)}
+          sub={`Last ${range} days`}
+          color="var(--blue)"
+        />
+        <StatCard
+          label="Issues Resolved"
+          value={(data.issuesTrend || []).reduce(
+            (s, d) => s + (d.resolved || 0),
+            0,
+          )}
+          sub="in period"
+          color="var(--green)"
+        />
+        <StatCard
+          label="New Users"
+          value={(data.userTrend || []).reduce((s, d) => s + d.count, 0)}
+          sub="registrations"
+          color="var(--purple)"
+        />
+        <StatCard
+          label="Top Issue"
+          value={(data.topIssues?.[0]?.supportCount || 0) + "▲"}
+          sub={(data.topIssues?.[0]?.title || "").slice(0, 24) + "…"}
+          color="var(--amber)"
+        />
       </div>
 
-      {/* Row: Day of Week Heatmap + Hourly Distribution */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
-        <div style={{ background: '#fff', border: '1.5px solid #e5e0d8', borderRadius: 12, padding: 24 }}>
-          <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 600 }}>Reports by Day of Week</h3>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={byDayOfWeek}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0ede8" />
-              <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#2563eb" radius={[4,4,0,0]} name="Reports" />
-            </BarChart>
-          </ResponsiveContainer>
+      {/* Two columns */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gap: 20,
+          marginBottom: 20,
+        }}
+      >
+        {/* Issue trend */}
+        <div
+          style={{
+            background: "var(--white)",
+            border: "2px solid var(--ink)",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.12em",
+              color: "#888",
+              marginBottom: 14,
+            }}
+          >
+            Issues Created vs Resolved
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <TrendLine
+              data={data.issuesTrend}
+              width={360}
+              height={80}
+              color="#c83232"
+            />
+          </div>
+          {data.issuesTrend?.length > 0 && (
+            <div
+              style={{
+                fontSize: 10,
+                color: "#aaa",
+                fontFamily: "var(--font-mono)",
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>{data.issuesTrend[0]?._id}</span>
+              <span>{data.issuesTrend[data.issuesTrend.length - 1]?._id}</span>
+            </div>
+          )}
         </div>
 
-        <div style={{ background: '#fff', border: '1.5px solid #e5e0d8', borderRadius: 12, padding: 24 }}>
-          <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 600 }}>Reports by Hour of Day</h3>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={byHour}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0ede8" />
-              <XAxis dataKey="hour" tick={{ fontSize: 10 }} tickFormatter={h => `${h}:00`} interval={3} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip labelFormatter={h => `${h}:00`} />
-              <Bar dataKey="count" fill="#d97706" radius={[3,3,0,0]} name="Reports" />
-            </BarChart>
-          </ResponsiveContainer>
+        {/* Category breakdown */}
+        <div
+          style={{
+            background: "var(--white)",
+            border: "2px solid var(--ink)",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.12em",
+              color: "#888",
+              marginBottom: 14,
+            }}
+          >
+            Issues by Category
+          </div>
+          {(data.categoryTrend || []).map((c, i) => (
+            <MiniBar
+              key={c._id}
+              label={c._id}
+              value={c.count}
+              max={maxCat}
+              color={BAR_COLORS[i % BAR_COLORS.length]}
+            />
+          ))}
         </div>
-      </div>
 
-      {/* Row: Top Locations + Top Neighborhoods */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
-        <div style={{ background: '#fff', border: '1.5px solid #e5e0d8', borderRadius: 12, padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>Top Locations</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {topLocations.slice(0, 7).map((loc, i) => {
-              const max = topLocations[0]?.count || 1;
+        {/* Day of week heatmap */}
+        <div
+          style={{
+            background: "var(--white)",
+            border: "2px solid var(--ink)",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.12em",
+              color: "#888",
+              marginBottom: 14,
+            }}
+          >
+            Issues by Day of Week
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              alignItems: "flex-end",
+              height: 80,
+            }}
+          >
+            {(data.byDayOfWeek || []).map((d, i) => {
+              const pct = maxDow > 0 ? d.count / maxDow : 0;
               return (
-                <div key={i}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 3 }}>
-                    <span style={{ fontWeight: 500 }}>{loc._id || 'Unknown'}</span>
-                    <span style={{ color: '#888' }}>{loc.count}</span>
-                  </div>
-                  <div style={{ background: '#f0ede8', borderRadius: 4, height: 6 }}>
-                    <div style={{ width: `${(loc.count / max) * 100}%`, background: '#2563eb', height: 6, borderRadius: 4, transition: 'width 0.4s' }} />
+                <div
+                  key={i}
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "100%",
+                      height: `${Math.max(4, pct * 60)}px`,
+                      background:
+                        pct > 0.7
+                          ? "var(--red)"
+                          : pct > 0.4
+                            ? "var(--amber)"
+                            : "var(--blue)",
+                      transition: "height 0.6s",
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: "#888",
+                      fontFamily: "var(--font-mono)",
+                    }}
+                  >
+                    {d.day}
                   </div>
                 </div>
               );
@@ -177,62 +422,228 @@ export default function AdminAnalytics() {
           </div>
         </div>
 
-        <div style={{ background: '#fff', border: '1.5px solid #e5e0d8', borderRadius: 12, padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>Neighborhood Activity</h3>
-          {topNeighborhoods.length === 0
-            ? <div style={{ color: '#aaa', padding: 20 }}>No neighborhood data yet</div>
-            : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {topNeighborhoods.map((n, i) => {
-                  const resolvedPct = n.count > 0 ? Math.round((n.resolved / n.count) * 100) : 0;
-                  return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{n._id}</div>
-                      <div style={{ fontSize: 12, color: '#888' }}>{n.count} issues</div>
-                      <div style={{ background: resolvedPct > 50 ? '#dcfce7' : '#fef9c3', color: resolvedPct > 50 ? '#059669' : '#a16207',
-                        borderRadius: 10, padding: '1px 8px', fontSize: 11, fontWeight: 600 }}>
-                        {resolvedPct}% resolved
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-          }
+        {/* Hourly heatmap */}
+        <div
+          style={{
+            background: "var(--white)",
+            border: "2px solid var(--ink)",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.12em",
+              color: "#888",
+              marginBottom: 14,
+            }}
+          >
+            Reports by Hour of Day
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 2,
+              alignItems: "flex-end",
+              height: 60,
+              overflow: "hidden",
+            }}
+          >
+            {(data.byHour || []).map((h) => {
+              const pct = maxHour > 0 ? h.count / maxHour : 0;
+              return (
+                <div
+                  key={h.hour}
+                  title={`${h.hour}:00 — ${h.count} issues`}
+                  style={{
+                    flex: 1,
+                    height: `${Math.max(2, pct * 56)}px`,
+                    background: `rgba(26,74,138,${0.2 + pct * 0.8})`,
+                    transition: "height 0.6s",
+                    cursor: "default",
+                  }}
+                />
+              );
+            })}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginTop: 4,
+              fontSize: 9,
+              color: "#aaa",
+            }}
+          >
+            <span>12am</span>
+            <span>6am</span>
+            <span>12pm</span>
+            <span>6pm</span>
+            <span>11pm</span>
+          </div>
         </div>
-      </div>
 
-      {/* Top Issues + Donation Trend */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
-        <div style={{ background: '#fff', border: '1.5px solid #e5e0d8', borderRadius: 12, padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>Most Supported Open Issues</h3>
-          {topIssues.length === 0
-            ? <div style={{ color: '#aaa', padding: 20 }}>No open issues</div>
-            : topIssues.map((issue, i) => (
-              <Link key={issue._id} to={`/issues/${issue._id}`}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
-                  borderBottom: i < topIssues.length - 1 ? '1px solid #f0ede8' : 'none',
-                  textDecoration: 'none', color: 'inherit' }}>
-                <span style={{ color: '#aaa', fontSize: 13, minWidth: 20 }}>#{i+1}</span>
-                <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{issue.title}</span>
-                <span style={{ fontSize: 12, color: '#888' }}>▲ {issue.supportCount}</span>
-              </Link>
-            ))
-          }
+        {/* Top locations */}
+        <div
+          style={{
+            background: "var(--white)",
+            border: "2px solid var(--ink)",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.12em",
+              color: "#888",
+              marginBottom: 14,
+            }}
+          >
+            Top Hotspot Locations
+          </div>
+          {(data.topLocations || []).slice(0, 8).map((l, i) => (
+            <MiniBar
+              key={l._id}
+              label={l._id}
+              value={l.count}
+              max={maxLoc}
+              color={i < 3 ? "var(--red)" : "var(--blue)"}
+            />
+          ))}
         </div>
 
-        <div style={{ background: '#fff', border: '1.5px solid #e5e0d8', borderRadius: 12, padding: 24 }}>
-          <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 600 }}>Monthly Donations</h3>
-          {donationTrend.length === 0
-            ? <div style={{ color: '#aaa', textAlign: 'center', padding: 40 }}>No donation data</div>
-            : <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={donationTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0ede8" />
-                  <XAxis dataKey="_id" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${v}`} />
-                  <Tooltip formatter={v => `$${v.toFixed(2)}`} />
-                  <Bar dataKey="total" fill="#059669" radius={[4,4,0,0]} name="Total ($)" />
-                </BarChart>
-              </ResponsiveContainer>
-          }
+        {/* Resolution by category */}
+        <div
+          style={{
+            background: "var(--white)",
+            border: "2px solid var(--ink)",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.12em",
+              color: "#888",
+              marginBottom: 14,
+            }}
+          >
+            Avg Resolution Time (hrs) by Category
+          </div>
+          {(data.resolutionByCategory || []).map((c) => (
+            <div
+              key={c._id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "6px 0",
+                borderBottom: "1px solid #f5f0e8",
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: "#555" }}>{c._id}</span>
+              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>
+                {c.avgHours < 24
+                  ? `${Math.round(c.avgHours)}h`
+                  : `${Math.round(c.avgHours / 24)}d`}
+                <span style={{ fontWeight: 400, color: "#aaa", fontSize: 10 }}>
+                  {" "}
+                  ({c.count} resolved)
+                </span>
+              </span>
+            </div>
+          ))}
+          {(!data.resolutionByCategory ||
+            data.resolutionByCategory.length === 0) && (
+            <div style={{ color: "#aaa", fontSize: 12 }}>
+              No resolved issues yet
+            </div>
+          )}
+        </div>
+
+        {/* Top supported issues */}
+        <div
+          style={{
+            background: "var(--white)",
+            border: "2px solid var(--ink)",
+            padding: 20,
+            gridColumn: "1 / -1",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.12em",
+              color: "#888",
+              marginBottom: 14,
+            }}
+          >
+            Most Supported Open Issues
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                minWidth: 500,
+                fontSize: 12,
+              }}
+            >
+              <thead>
+                <tr style={{ background: "var(--paper)" }}>
+                  {["Title", "Category", "Priority", "Status", "Supports"].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: "8px 12px",
+                          textAlign: "left",
+                          fontSize: 10,
+                          fontFamily: "var(--font-mono)",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.08em",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {(data.topIssues || []).map((issue, i) => (
+                  <tr
+                    key={issue._id}
+                    style={{ borderBottom: "1px solid #f0ebe0" }}
+                  >
+                    <td style={{ padding: "10px 12px", fontWeight: 600 }}>
+                      {issue.title}
+                    </td>
+                    <td style={{ padding: "10px 12px", color: "#666" }}>
+                      {issue.category}
+                    </td>
+                    <td style={{ padding: "10px 12px" }}>{issue.priority}</td>
+                    <td style={{ padding: "10px 12px" }}>{issue.status}</td>
+                    <td
+                      style={{
+                        padding: "10px 12px",
+                        fontFamily: "var(--font-display)",
+                        fontWeight: 800,
+                        color: "var(--amber)",
+                      }}
+                    >
+                      ▲ {issue.supportCount}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
