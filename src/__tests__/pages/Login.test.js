@@ -1,32 +1,29 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
+import { authAPI } from '../api';
 import Login from '../pages/Login';
 
-// Mock toast
+jest.mock('../api');
 jest.mock('react-hot-toast', () => ({
   __esModule: true,
-  default: {
-    success: jest.fn(),
-    error: jest.fn(),
-  },
+  default: { success: jest.fn(), error: jest.fn() },
 }));
 
-// Mock components
-jest.mock('../components/Navbar', () => () => <div data-testid="navbar">Navbar</div>);
-jest.mock('../components/Footer', () => () => <div data-testid="footer">Footer</div>);
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => mockNavigate,
+}));
 
-const renderWithProviders = (component) => {
-  return render(
+const renderWithProviders = (component) =>
+  render(
     <BrowserRouter>
-      <AuthProvider>
-        {component}
-      </AuthProvider>
+      <AuthProvider>{component}</AuthProvider>
     </BrowserRouter>
   );
-};
 
 describe('Login', () => {
   const user = userEvent.setup();
@@ -36,82 +33,154 @@ describe('Login', () => {
     localStorage.clear();
   });
 
-  test('renders login form', () => {
+  // ── Rendering ────────────────────────────────────────────
+  test('renders login form with all fields', () => {
     renderWithProviders(<Login />);
 
     expect(screen.getByText('Welcome Back')).toBeInTheDocument();
-    expect(screen.getByText('Sign in to your PublicBoard account')).toBeInTheDocument();
+    expect(screen.getByText(/sign in to your PublicBoard account/i)).toBeInTheDocument();
     expect(screen.getByLabelText('Email')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /login/i })).toBeInTheDocument();
   });
 
-  test('shows logo', () => {
+  test('renders logo image', () => {
     renderWithProviders(<Login />);
-
     expect(screen.getByAltText('PublicBoard')).toBeInTheDocument();
   });
 
-  test('validates required fields', async () => {
+  test('renders link to registration page', () => {
     renderWithProviders(<Login />);
 
-    const submitButton = screen.getByRole('button', { name: 'Login' });
-    await user.click(submitButton);
-
-    // Should show validation errors
-    expect(screen.getByDisplayValue('')).toBeInTheDocument();
+    expect(screen.getByText(/don't have an account/i)).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /create one/i });
+    expect(link).toBeInTheDocument();
   });
 
-  test('handles form input changes', async () => {
+  test('renders forgot password link', () => {
     renderWithProviders(<Login />);
 
-    const emailInput = screen.getByLabelText('Email');
-    const passwordInput = screen.getByLabelText('Password');
-
-    await user.type(emailInput, 'test@example.com');
-    await user.type(passwordInput, 'password123');
-
-    expect(emailInput).toHaveValue('test@example.com');
-    expect(passwordInput).toHaveValue('password123');
+    const link = screen.getByRole('link', { name: /forgot password/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('href', '/forgot-password');
   });
 
-  test('shows register link', () => {
+  // ── Form interaction ─────────────────────────────────────
+  test('accepts email and password input', async () => {
     renderWithProviders(<Login />);
 
-    expect(screen.getByText(/Don't have an account/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Create one' })).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Email'), 'test@example.com');
+    await user.type(screen.getByLabelText('Password'), 'password123');
+
+    expect(screen.getByLabelText('Email')).toHaveValue('test@example.com');
+    expect(screen.getByLabelText('Password')).toHaveValue('password123');
   });
 
-  test('displays loading state during submission', async () => {
+  // ── Loading state ────────────────────────────────────────
+  test('disables submit button while login request is in flight', async () => {
+    authAPI.login.mockImplementation(
+      () => new Promise((resolve) => setTimeout(resolve, 200))
+    );
+
     renderWithProviders(<Login />);
 
-    const emailInput = screen.getByLabelText('Email');
-    const passwordInput = screen.getByLabelText('Password');
-    const submitButton = screen.getByRole('button', { name: 'Login' });
+    await user.type(screen.getByLabelText('Email'), 'test@example.com');
+    await user.type(screen.getByLabelText('Password'), 'password123');
+    await user.click(screen.getByRole('button', { name: /login/i }));
 
-    await user.type(emailInput, 'test@example.com');
-    await user.type(passwordInput, 'password123');
-
-    // Mock login function that takes time
-    const mockLogin = jest.fn(() => new Promise(resolve => setTimeout(() => resolve({ name: 'Test User' }), 100)));
-    
-    // This would need to be connected to actual auth context in a real test
-    // For now, we'll just test the UI state
-    fireEvent.click(submitButton);
-
-    // Should show loading state
-    expect(submitButton).toBeDisabled();
+    expect(screen.getByRole('button', { name: /login/i })).toBeDisabled();
   });
 
-  test('handles error display', () => {
+  // ── Error display ─────────────────────────────────────────
+  // FIX: removed DOM injection hack. Now properly mocks authAPI.login rejection
+  // so the component's own error state is exercised.
+  test('shows error message on invalid credentials', async () => {
+    authAPI.login.mockRejectedValue({
+      response: { data: { message: 'Invalid email or password' } },
+    });
+
     renderWithProviders(<Login />);
 
-    // Simulate error state
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-msg';
-    errorDiv.textContent = 'Invalid credentials';
-    document.body.appendChild(errorDiv);
+    await user.type(screen.getByLabelText('Email'), 'wrong@example.com');
+    await user.type(screen.getByLabelText('Password'), 'wrongpassword');
+    await user.click(screen.getByRole('button', { name: /login/i }));
 
-    expect(screen.getByText('Invalid credentials')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Invalid email or password')).toBeInTheDocument();
+    });
+  });
+
+  test('shows fallback error message when no server message', async () => {
+    authAPI.login.mockRejectedValue(new Error('Network error'));
+
+    renderWithProviders(<Login />);
+
+    await user.type(screen.getByLabelText('Email'), 'test@example.com');
+    await user.type(screen.getByLabelText('Password'), 'password123');
+    await user.click(screen.getByRole('button', { name: /login/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/login failed|check your credentials/i)
+      ).toBeInTheDocument();
+    });
+  });
+
+  test('shows suspended message for a banned user', async () => {
+    authAPI.login.mockRejectedValue({
+      response: { data: { message: 'Account suspended: spam' } },
+    });
+
+    renderWithProviders(<Login />);
+
+    await user.type(screen.getByLabelText('Email'), 'banned@example.com');
+    await user.type(screen.getByLabelText('Password'), 'password123');
+    await user.click(screen.getByRole('button', { name: /login/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Account suspended: spam')).toBeInTheDocument();
+    });
+  });
+
+  // ── Successful login ──────────────────────────────────────
+  test('stores token and navigates to /dashboard for regular users', async () => {
+    authAPI.login.mockResolvedValue({
+      data: {
+        token: 'access-token',
+        refreshToken: 'refresh-token',
+        user: { id: '1', name: 'Alice', email: 'alice@example.com', role: 'user' },
+      },
+    });
+
+    renderWithProviders(<Login />);
+
+    await user.type(screen.getByLabelText('Email'), 'alice@example.com');
+    await user.type(screen.getByLabelText('Password'), 'password123');
+    await user.click(screen.getByRole('button', { name: /login/i }));
+
+    await waitFor(() => {
+      expect(localStorage.getItem('pb_token')).toBe('access-token');
+      expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+    });
+  });
+
+  test('navigates to /admin for admin users', async () => {
+    authAPI.login.mockResolvedValue({
+      data: {
+        token: 'admin-token',
+        refreshToken: 'refresh-token',
+        user: { id: '2', name: 'Admin', email: 'admin@example.com', role: 'admin' },
+      },
+    });
+
+    renderWithProviders(<Login />);
+
+    await user.type(screen.getByLabelText('Email'), 'admin@example.com');
+    await user.type(screen.getByLabelText('Password'), 'password123');
+    await user.click(screen.getByRole('button', { name: /login/i }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/admin');
+    });
   });
 });
