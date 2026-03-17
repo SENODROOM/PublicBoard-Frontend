@@ -1,37 +1,40 @@
 import React, { useState, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
-import useSSE              from './hooks/useSSE';
-import useNotifications    from './hooks/useNotifications';
+import useSSE           from './hooks/useSSE';
+import useNotifications from './hooks/useNotifications';
 
-import Navbar              from './components/Navbar';
-import NotificationPanel   from './components/NotificationPanel';
-import Footer              from './components/Footer';
-import ErrorBoundary       from './components/ErrorBoundary';
+import Navbar            from './components/Navbar';
+import NotificationPanel from './components/NotificationPanel';
+import Footer            from './components/Footer';
+import ErrorBoundary     from './components/ErrorBoundary';
 
-import Home                from './pages/Home';
-import Dashboard           from './pages/Dashboard';
-import IssueDetail         from './pages/IssueDetail';
-import ReportIssue         from './pages/ReportIssue';
-import Donate              from './pages/Donate';
-import Login               from './pages/Login';
-import Register            from './pages/Register';
-import UserProfile         from './pages/UserProfile';
-import Bookmarks           from './pages/Bookmarks';
-import AdvancedSearch      from './pages/AdvancedSearch';
+import Home              from './pages/Home';
+import Dashboard         from './pages/Dashboard';
+import IssueDetail       from './pages/IssueDetail';
+import ReportIssue       from './pages/ReportIssue';
+import Donate            from './pages/Donate';
+import Login             from './pages/Login';
+import Register          from './pages/Register';
+import UserProfile       from './pages/UserProfile';
+import Bookmarks         from './pages/Bookmarks';
+import AdvancedSearch    from './pages/AdvancedSearch';
+import ForgotPassword    from './pages/ForgotPassword';
+import ResetPassword     from './pages/ResetPassword';
+import VerifyEmail       from './pages/VerifyEmail';
 
-import AdminLayout         from './pages/admin/AdminLayout';
-import AdminOverview       from './pages/admin/AdminOverview';
-import AdminIssues         from './pages/admin/AdminIssues';
-import AdminUsers          from './pages/admin/AdminUsers';
-import AdminDonations      from './pages/admin/AdminDonations';
-import AdminAnalytics      from './pages/admin/AdminAnalytics';
-import AdminActivityLog    from './pages/admin/AdminActivityLog';
-import AdminAnnouncements  from './pages/admin/AdminAnnouncements';
+import AdminLayout       from './pages/admin/AdminLayout';
+import AdminOverview     from './pages/admin/AdminOverview';
+import AdminIssues       from './pages/admin/AdminIssues';
+import AdminUsers        from './pages/admin/AdminUsers';
+import AdminDonations    from './pages/admin/AdminDonations';
+import AdminAnalytics    from './pages/admin/AdminAnalytics';
+import AdminActivityLog  from './pages/admin/AdminActivityLog';
+import AdminAnnouncements from './pages/admin/AdminAnnouncements';
 
-// ── Route guards ─────────────────────────────────────────
+// ── Route guards ──────────────────────────────────────────
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="loading"><div className="spinner" />Loading…</div>;
@@ -47,25 +50,41 @@ function AdminRoute({ children }) {
   return children;
 }
 
-// ── Main app shell (needs auth context) ──────────────────
+// ── Unverified email banner ───────────────────────────────
+function EmailVerificationBanner() {
+  const { user } = useAuth();
+  const [dismissed, setDismissed] = useState(false);
+  if (!user || user.isEmailVerified || dismissed) return null;
+  return (
+    <div style={{
+      background: '#fffbeb', borderBottom: '2px solid #f59e0b',
+      padding: '10px 20px', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', gap: 12, fontSize: 13, flexWrap: 'wrap',
+    }}>
+      <span>⚠️ Your email address hasn't been verified yet.</span>
+      <span style={{ color: '#666' }}>Check your inbox for a verification link.</span>
+      <button
+        onClick={() => setDismissed(true)}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: 18, lineHeight: 1, padding: 0 }}
+        aria-label="Dismiss"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+// ── Main app shell ────────────────────────────────────────
 function AppShell() {
   const { user } = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
-  const {
-    notifications, unreadCount,
-    markRead, markAllRead, addNotification
-  } = useNotifications();
+  const { notifications, unreadCount, markRead, markAllRead, addNotification } = useNotifications();
 
-  // SSE handler — real-time events
   const handleSSE = useCallback((event) => {
     if (event.type === 'notification') {
       const { recipientId, notification } = event.payload;
-      if (user && recipientId === user.id) {
-        addNotification(notification);
-      }
+      if (user && recipientId === user.id) addNotification(notification);
     }
-    // Other event types (issue.created, issue.status, etc.)
-    // are handled locally in each page via their own re-fetch logic
   }, [user, addNotification]);
 
   useSSE(handleSSE, !!user);
@@ -74,8 +93,7 @@ function AppShell() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-
-      {/* Skip-to-content — visible on keyboard focus only */}
+      {/* Skip-to-content */}
       <a
         href="#main-content"
         style={{
@@ -83,13 +101,15 @@ function AppShell() {
           background: 'var(--amber)', color: 'var(--ink)',
           padding: '8px 16px', fontFamily: 'var(--font-mono)',
           fontSize: 12, fontWeight: 700, textDecoration: 'none',
-          zIndex: 9999, transition: 'top 0.15s'
+          zIndex: 9999, transition: 'top 0.15s',
         }}
         onFocus={e => { e.target.style.top = '0'; }}
         onBlur={e => { e.target.style.top = '-60px'; }}
       >
         Skip to main content
       </a>
+
+      <EmailVerificationBanner />
 
       {!isAdminRoute && (
         <Navbar
@@ -119,55 +139,64 @@ function AppShell() {
         <ErrorBoundary>
           <Routes>
             {/* Public */}
-            <Route path="/"            element={<Home />} />
-            <Route path="/dashboard"   element={<Dashboard />} />
-            <Route path="/issues/:id"  element={<IssueDetail />} />
-            <Route path="/report"      element={<ReportIssue />} />
-            <Route path="/donate"      element={<Donate />} />
-            <Route path="/login"       element={<Login />} />
-            <Route path="/register"    element={<Register />} />
-            <Route path="/search"      element={<AdvancedSearch />} />
+            <Route path="/"               element={<Home />} />
+            <Route path="/dashboard"      element={<Dashboard />} />
+            <Route path="/issues/:id"     element={<IssueDetail />} />
+            <Route path="/report"         element={<ReportIssue />} />
+            <Route path="/donate"         element={<Donate />} />
+            <Route path="/login"          element={<Login />} />
+            <Route path="/register"       element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/verify-email"   element={<VerifyEmail />} />
+            <Route path="/search"         element={<AdvancedSearch />} />
 
-            {/* Authenticated */}
-            <Route path="/profile"   element={<RequireAuth><UserProfile /></RequireAuth>} />
+            {/* Protected */}
+            <Route path="/profile" element={<RequireAuth><UserProfile /></RequireAuth>} />
             <Route path="/bookmarks" element={<RequireAuth><Bookmarks /></RequireAuth>} />
 
             {/* Admin */}
             <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-              <Route index                 element={<AdminOverview />} />
-              <Route path="issues"         element={<AdminIssues />} />
-              <Route path="users"          element={<AdminUsers />} />
-              <Route path="donations"      element={<AdminDonations />} />
-              <Route path="analytics"      element={<AdminAnalytics />} />
-              <Route path="activity"       element={<AdminActivityLog />} />
-              <Route path="announcements"  element={<AdminAnnouncements />} />
+              <Route index        element={<AdminOverview />} />
+              <Route path="issues"        element={<AdminIssues />} />
+              <Route path="users"         element={<AdminUsers />} />
+              <Route path="donations"     element={<AdminDonations />} />
+              <Route path="analytics"     element={<AdminAnalytics />} />
+              <Route path="activity"      element={<AdminActivityLog />} />
+              <Route path="announcements" element={<AdminAnnouncements />} />
             </Route>
 
-            {/* 404 */}
-            <Route path="*" element={
-              <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-                <img
-                  src="/logo.png"
-                  alt="PublicBoard"
-                  style={{
-                    width: 80,
-                    height: 80,
-                    objectFit: 'contain',
-                    marginBottom: 24,
-                    opacity: 0.5,
-                  }}
-                />
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 80, fontWeight: 800, color: 'var(--ink)', lineHeight: 1 }}>404</div>
-                <div style={{ fontSize: 18, color: '#888', marginTop: 16 }}>Page not found</div>
-                <a href="/" style={{ display: 'inline-block', marginTop: 24, padding: '10px 24px', background: 'var(--ink)', color: '#fff', textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 13 }}>← Go Home</a>
-              </div>
-            } />
+            {/* Fallback */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </ErrorBoundary>
       </main>
 
-      {/* Footer on every public page — hidden inside /admin */}
       {!isAdminRoute && <Footer />}
+
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            fontFamily: 'var(--font-mono)',
+            fontSize: 13,
+            border: '2px solid var(--ink)',
+            borderRadius: 0,
+          },
+        }}
+      />
+    </div>
+  );
+}
+
+function NotFound() {
+  return (
+    <div style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 20 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 80, fontWeight: 800, color: 'var(--amber)', lineHeight: 1 }}>404</div>
+      <h2 style={{ fontSize: 24, margin: '16px 0 8px' }}>Page not found</h2>
+      <p style={{ color: '#666', fontSize: 14, marginBottom: 28 }}>The page you're looking for doesn't exist or has been moved.</p>
+      <Link to="/" className="btn btn-primary">Go Home</Link>
     </div>
   );
 }
@@ -177,21 +206,6 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppShell />
-        <Toaster
-          position="bottom-right"
-          toastOptions={{
-            style: {
-              fontFamily: 'var(--font-mono)',
-              fontSize: 12,
-              background: 'var(--ink)',
-              color: '#fff',
-              border: '1px solid var(--amber)',
-              borderRadius: 0,
-            },
-            success: { iconTheme: { primary: '#2a7a4a', secondary: '#fff' } },
-            error:   { iconTheme: { primary: '#c83232', secondary: '#fff' } },
-          }}
-        />
       </AuthProvider>
     </BrowserRouter>
   );
